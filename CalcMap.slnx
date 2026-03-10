@@ -1,0 +1,11 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="MapGenerator/MapGenerator.csproj" Id="4492bde3-b9cd-4690-a117-2ea4d2ff98d5">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
+  <Project Path="RunAnalyzer/RunAnalyzer.csproj" Id="2f07e516-1d45-4165-82c6-068fd45bc306" />
+  <Project Path="ThreatAnalyzer/ThreatAnalyzer.csproj" Id="3fbb3436-1923-4d0a-8274-d205feefad71" />
+</Solution>
