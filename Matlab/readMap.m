@@ -3,6 +3,32 @@ function [map,xmin,xmax,ymin,ymax] = readMap(file)
 txt = fileread(file);
 data = jsondecode(txt);
 
+if ischar(data) || (isstring(data) && isscalar(data))
+    error('readMap:InvalidSchema', ...
+        'Invalid map JSON in "%s". Expected object with fields "Parameters" and "Threats", got string.', file);
+end
+
+% Accept a few common wrappers, but enforce map schema:
+% root object with fields Parameters and Threats.
+if iscell(data) && numel(data) == 1
+    data = data{1};
+end
+
+if isstruct(data) && ~isscalar(data)
+    if isfield(data(1),'Parameters') && isfield(data(1),'Threats')
+        data = data(1);
+    else
+        error('readMap:InvalidSchema', ...
+            'Invalid map JSON in "%s". Expected object with fields "Parameters" and "Threats".', file);
+    end
+end
+
+if ~isstruct(data) || ~isscalar(data) || ...
+        ~isfield(data,'Parameters') || ~isfield(data,'Threats')
+    error('readMap:InvalidSchema', ...
+        'Invalid map JSON in "%s". Expected object with fields "Parameters" and "Threats".', file);
+end
+
 params = data.Parameters;
 
 xmin = params.XMin;
@@ -12,7 +38,19 @@ ymax = params.YMax;
 
 threats = data.Threats;
 
-res = threats(1).Resolution;
+if isempty(threats)
+    error('readMap:NoThreats', ...
+        'Map JSON in "%s" has no threats.', file);
+end
+
+if isfield(threats(1),'Resolution')
+    res = threats(1).Resolution;
+elseif isfield(params,'Resolution')
+    res = params.Resolution;
+else
+    error('readMap:MissingResolution', ...
+        'Map JSON in "%s" is missing "Resolution" in threats or parameters.', file);
+end
 
 nx = round((xmax-xmin)/res)+1;
 ny = round((ymax-ymin)/res)+1;
