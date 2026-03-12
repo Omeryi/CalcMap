@@ -9,11 +9,12 @@ namespace ns_ThreatAnalyzer
 
     public class Threat
     {
-        public const double resolution = 0.1;
+        public const double resolution = 0.1; // Not serializable
         public Guid Id { get; set; }
         public double CenterX { get; set; }
         public double CenterY { get; set; }
         public double Radius { get; set; }
+        public double Resolution { get { return resolution; } }
         public float[][] Image { get; set; }
     }
 

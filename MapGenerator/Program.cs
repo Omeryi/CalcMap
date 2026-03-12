@@ -38,11 +38,11 @@ namespace MapGenerator
     {
         static void Main(string[] args)
         {
-            if (args.Length != 0 && args.Length != 8)
+            if (args.Length != 0 && args.Length != 7)
             {
                 Console.WriteLine(
                     "Usage:\n" +
-                    "MapGenerator.exe output.json xmin xmax ymin ymax regionCount rMin rMax"
+                    "MapGenerator.exe xmin xmax ymin ymax regionCount rMin rMax"
                 );
                 return;
             }
@@ -53,10 +53,10 @@ namespace MapGenerator
 
             double xmin = -100, xmax = 100;
             double ymin = -100, ymax = 100;
-            int regionCount = 1;
+            int regionCount = 10;
             double rMin = 10, rMax = 30;
 
-            if (args.Length == 8)
+            if (args.Length == 7)
             {
                 xmin = double.Parse(args[0]);
                 xmax = double.Parse(args[1]);
@@ -84,7 +84,7 @@ namespace MapGenerator
             string mapFolder = Path.Combine(mapsRoot, map.MapId.ToString());
             Directory.CreateDirectory(mapFolder);
             string outputPath = Path.Combine(mapFolder, "map.json");
-            var json = JsonConvert.SerializeObject(outputPath, Formatting.Indented);
+            var json = JsonConvert.SerializeObject(map, Formatting.Indented);
             File.WriteAllText(outputPath, json);
 
             Console.WriteLine($"Map saved to {outputPath}");
