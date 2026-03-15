@@ -17,21 +17,14 @@ points = struct("X", num2cell(path(:,1)), "Y", num2cell(path(:,2)));
 out = struct("Points", points);
 json = jsonencode(out, "PrettyPrint", true);
 
-files = dir(fullfile(mapFolder, "path*.json"));
-maxIdx = 0;
-for i = 1:numel(files)
-    token = regexp(files(i).name, "^path(\d+)\.json$", "tokens", "once");
-    if isempty(token)
-        continue
-    end
-
-    idx = str2double(token{1});
-    if ~isnan(idx)
-        maxIdx = max(maxIdx, idx);
-    end
+timestamp = string(datetime("now", "Format", "yyyyMMdd_HHmm"));
+baseName = "path_" + timestamp;
+file = fullfile(mapFolder, baseName + ".json");
+suffix = 2;
+while isfile(file)
+    file = fullfile(mapFolder, baseName + "_" + string(suffix) + ".json");
+    suffix = suffix + 1;
 end
-
-file = fullfile(mapFolder, sprintf("path%d.json", maxIdx + 1));
 
 fid = fopen(file, "w");
 if fid < 0
