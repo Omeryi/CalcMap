@@ -1,12 +1,21 @@
-﻿using ns_ThreatAnalyzer;
+using ns_ThreatAnalyzer;
 using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 
 namespace MapGenerator
 {
     public class MapGenerator
     {
-        private readonly Random rand = new Random();
+        private readonly Random rand = CreateRandom();
+
+        private struct CellBounds
+        {
+            public double MinX;
+            public double MaxX;
+            public double MinY;
+            public double MaxY;
+        }
 
         public Map Generate(MapParameters parameters)
         {
@@ -17,18 +26,32 @@ namespace MapGenerator
                 Threats = new List<Threat>()
             };
 
+            List<CellBounds> cells = BuildStratifiedCells(parameters, parameters.RegionCount);
             for (int i = 0; i < parameters.RegionCount; i++)
             {
-                map.Threats.Add(GenerateThreat(parameters));
+                CellBounds? cell = i < cells.Count ? (CellBounds?)cells[i] : null;
+                map.Threats.Add(GenerateThreat(parameters, cell));
             }
 
             return map;
         }
 
-        private Threat GenerateThreat(MapParameters parameters)
+        private Threat GenerateThreat(MapParameters parameters, CellBounds? centerCell)
         {
-            double x = RandomBetween(parameters.XMin, parameters.XMax);
-            double y = RandomBetween(parameters.YMin, parameters.YMax);
+            double x;
+            double y;
+            if (centerCell.HasValue)
+            {
+                CellBounds cell = centerCell.Value;
+                x = RandomBetween(cell.MinX, cell.MaxX);
+                y = RandomBetween(cell.MinY, cell.MaxY);
+            }
+            else
+            {
+                x = RandomBetween(parameters.XMin, parameters.XMax);
+                y = RandomBetween(parameters.YMin, parameters.YMax);
+            }
+
             double r = RandomBetween(parameters.RadiusMin, parameters.RadiusMax);
 
             return new Threat
@@ -58,7 +81,7 @@ namespace MapGenerator
 
             // Standard deviation of the Gaussian.
             // Choosing radius / 3 ensures that most of the Gaussian mass
-            // lies inside the threat radius (~99% within 3σ).
+            // lies inside the threat radius (~99% within 3 sigma).
             double sigma = radius / 3.0;
             double twoSigmaSq = 2 * sigma * sigma;
 
@@ -103,9 +126,88 @@ namespace MapGenerator
             return image;
         }
 
+        private List<CellBounds> BuildStratifiedCells(MapParameters parameters, int count)
+        {
+            List<CellBounds> cells = new List<CellBounds>();
+            if (count <= 0)
+            {
+                return cells;
+            }
+
+            double width = parameters.XMax - parameters.XMin;
+            double height = parameters.YMax - parameters.YMin;
+            if (width <= 0 || height <= 0)
+            {
+                return cells;
+            }
+
+            // Stratified random placement keeps threats random but avoids heavy clustering.
+            double aspect = width / height;
+            int cols = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(count * aspect)));
+            int rows = Math.Max(1, (int)Math.Ceiling((double)count / cols));
+            while (rows * cols < count)
+            {
+                rows++;
+            }
+
+            double cellWidth = width / cols;
+            double cellHeight = height / rows;
+            cells = new List<CellBounds>(rows * cols);
+
+            for (int row = 0; row < rows; row++)
+            {
+                for (int col = 0; col < cols; col++)
+                {
+                    double minX = parameters.XMin + col * cellWidth;
+                    double maxX = col == cols - 1 ? parameters.XMax : minX + cellWidth;
+                    double minY = parameters.YMin + row * cellHeight;
+                    double maxY = row == rows - 1 ? parameters.YMax : minY + cellHeight;
+
+                    cells.Add(new CellBounds
+                    {
+                        MinX = minX,
+                        MaxX = maxX,
+                        MinY = minY,
+                        MaxY = maxY
+                    });
+                }
+            }
+
+            Shuffle(cells);
+            if (cells.Count > count)
+            {
+                cells.RemoveRange(count, cells.Count - count);
+            }
+
+            return cells;
+        }
+
+        private void Shuffle(List<CellBounds> cells)
+        {
+            for (int i = cells.Count - 1; i > 0; i--)
+            {
+                int j = rand.Next(i + 1);
+                CellBounds temp = cells[i];
+                cells[i] = cells[j];
+                cells[j] = temp;
+            }
+        }
+
         private double RandomBetween(double min, double max)
         {
             return min + rand.NextDouble() * (max - min);
+        }
+
+        private static Random CreateRandom()
+        {
+            byte[] seedBytes = new byte[4];
+            using (RandomNumberGenerator rng = RandomNumberGenerator.Create())
+            {
+                rng.GetBytes(seedBytes);
+            }
+
+            int seed = BitConverter.ToInt32(seedBytes, 0);
+            return new Random(seed);
         }
     }
 }

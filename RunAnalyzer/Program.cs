@@ -44,12 +44,14 @@ namespace RunAnalyzer
             List<Point> path = LoadPath(pathPath);
 
             ThreatAnalyzer threatAnalyzer = new ThreatAnalyzer();
+            Stopwatch stopwatch = Stopwatch.StartNew();
             List<ThreatResult> results = threatAnalyzer.Analyze(map.Threats, path);
+            stopwatch.Stop();
 
-            List<AnalysisResultRow> outputRows = BuildOutputRows(threatAnalyzer, map.Threats, path, results);
+            List<AnalysisResultRow> outputRows = BuildOutputRows(results, stopwatch.Elapsed.TotalMilliseconds);
             AnalysisOutput output = new AnalysisOutput
             {
-                TotalElapsedMilliseconds = SumElapsedMilliseconds(outputRows),
+                TotalElapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds,
                 Results = outputRows
             };
 
@@ -99,41 +101,25 @@ namespace RunAnalyzer
             return points;
         }
 
-        private static List<AnalysisResultRow> BuildOutputRows(
-            ThreatAnalyzer threatAnalyzer,
-            List<Threat> threats,
-            List<Point> path,
-            List<ThreatResult> results)
+        private static List<AnalysisResultRow> BuildOutputRows(List<ThreatResult> results, double totalElapsedMilliseconds)
         {
             List<AnalysisResultRow> rows = new List<AnalysisResultRow>(results.Count);
+            double averagePerThreat = results.Count > 0
+                ? totalElapsedMilliseconds / results.Count
+                : 0.0;
 
             for (int i = 0; i < results.Count; i++)
             {
-                Threat threat = threats[i];
-                Stopwatch stopwatch = Stopwatch.StartNew();
-                threatAnalyzer.Analyze(new List<Threat> { threat }, path);
-                stopwatch.Stop();
-
                 rows.Add(new AnalysisResultRow
                 {
                     Id = results[i].Id,
                     Grade = results[i].Grade,
-                    ElapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds
+                    // Backward-compatible field for existing GUI table; this is average time, not per-threat measured time.
+                    ElapsedMilliseconds = averagePerThreat
                 });
             }
 
             return rows;
-        }
-
-        private static double SumElapsedMilliseconds(List<AnalysisResultRow> rows)
-        {
-            double total = 0;
-            for (int i = 0; i < rows.Count; i++)
-            {
-                total += rows[i].ElapsedMilliseconds;
-            }
-
-            return total;
         }
 
         private static string GetOutputPath(string mapPath, string pathPath)
