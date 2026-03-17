@@ -13,6 +13,6 @@ displayMap(ax, ...
     mapState.Threats);
 
 drawPath(ax, pathPoints);
-title(ax, "Map: " + string(mapState.Name));
+title(ax, "Map: " + formatMapDisplayName(mapState));
 
 end

@@ -11,6 +11,7 @@ avgMs = totalMs / size(tableData, 1);
 pathLength = getPathLength(pathPoints);
 pathResolution = getPathResolution(pathPoints);
 threatResolution = getThreatResolution(mapState.Threats);
+mapGuid = getMapGuid(mapState);
 
 columnWidths = [300 130 130 120];
 tableWidth = sum(columnWidths);
@@ -30,7 +31,7 @@ summaryLabel1.Position = [20 figureHeight - 46 figureWidth - 40 32];
 summaryLabel1.FontWeight = "bold";
 summaryLabel1.WordWrap = "on";
 summaryLabel1.Text = sprintf("Map: %s | Path: %s%s | Total: %.3f ms | Avg/threat: %.3f ms", ...
-    char(mapState.Name), pathName, pathExt, totalMs, avgMs);
+    char(mapGuid), pathName, pathExt, totalMs, avgMs);
 
 summaryLabel2 = uilabel(resultsFigure);
 summaryLabel2.Position = [20 figureHeight - 82 figureWidth - 40 28];
@@ -104,19 +105,6 @@ end
 for i = 1:size(pathPoints, 1) - 1
     delta = pathPoints(i + 1, :) - pathPoints(i, :);
     lengthValue = lengthValue + hypot(delta(1), delta(2));
-end
-
-end
-
-function resolution = getThreatResolution(threats)
-
-resolution = NaN;
-if isempty(threats)
-    return
-end
-
-if isfield(threats, "Resolution")
-    resolution = threats(1).Resolution;
 end
 
 end

@@ -113,7 +113,13 @@ classdef calcMapApp < matlab.apps.AppBase
 
             try
                 currentResolution = getPathResolution(app.Path);
-                [ok, spacing] = promptPathResolution(currentResolution);
+                threatResolution = getThreatResolution(app.Map.Threats);
+                defaultSpacing = 2 * threatResolution;
+                if ~isfinite(defaultSpacing) || defaultSpacing <= 0
+                    defaultSpacing = currentResolution;
+                end
+
+                [ok, spacing] = promptPathResolution(defaultSpacing, currentResolution);
                 if ~ok
                     app.updateStatus("Save path cancelled");
                     return

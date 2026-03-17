@@ -1,11 +1,15 @@
-function [ok, spacing] = promptPathResolution(currentResolution)
+function [ok, spacing] = promptPathResolution(defaultResolution, currentResolution)
 
-if nargin < 1 || ~isfinite(currentResolution) || currentResolution <= 0
+if nargin < 1 || ~isfinite(defaultResolution) || defaultResolution <= 0
+    defaultResolution = 1;
+end
+
+if nargin < 2 || ~isfinite(currentResolution) || currentResolution <= 0
     currentResolution = 1;
 end
 
-prompt = {sprintf("Path resolution / spacing between saved points (current average %.3f)", currentResolution)};
-answer = inputdlg(prompt, "Save Path Resolution", [1 60], {num2str(currentResolution)});
+prompt = {sprintf("Path resolution / spacing between saved points (default %.3f, current average %.3f)", defaultResolution, currentResolution)};
+answer = inputdlg(prompt, "Save Path Resolution", [1 60], {num2str(defaultResolution)});
 if isempty(answer)
     ok = false;
     spacing = NaN;

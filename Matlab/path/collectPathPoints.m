@@ -4,8 +4,16 @@ if nargin < 5
     existingPath = [];
 end
 
+mapLabel = string(mapName);
+if nargin >= 4 && ~isempty(mapState)
+    formattedName = formatMapDisplayName(mapState);
+    if strlength(formattedName) > 0
+        mapLabel = formattedName;
+    end
+end
+
 drawMap(ax, mapState, existingPath);
-title(ax, "Map: " + string(mapName) + " | Click points, ENTER to finish, ESC to cancel");
+title(ax, "Map: " + mapLabel + " | Click points, ENTER to finish, ESC to cancel");
 
 originalButtonDownFcn = fig.WindowButtonDownFcn;
 originalKeyPressFcn = fig.WindowKeyPressFcn;
@@ -90,7 +98,7 @@ end
             ax.XLimMode = originalXLimMode;
             ax.YLimMode = originalYLimMode;
             ax.NextPlot = originalNextPlot;
-            title(ax, "Map: " + string(mapName));
+            title(ax, "Map: " + mapLabel);
         end
     end
 
