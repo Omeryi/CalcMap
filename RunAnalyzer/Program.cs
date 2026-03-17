@@ -1,3 +1,4 @@
+using MapGenerator;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using ns_ThreatAnalyzer;
@@ -8,12 +9,6 @@ using System.IO;
 
 namespace RunAnalyzer
 {
-    internal class MapDocument
-    {
-        public Guid MapId { get; set; }
-        public List<Threat> Threats { get; set; }
-    }
-
     internal class AnalysisResultRow
     {
         public Guid Id { get; set; }
@@ -45,7 +40,7 @@ namespace RunAnalyzer
             ValidateInputFile(mapPath, "map");
             ValidateInputFile(pathPath, "path");
 
-            MapDocument map = LoadMap(mapPath);
+            Map map = LoadMap(mapPath);
             List<Point> path = LoadPath(pathPath);
 
             ThreatAnalyzer threatAnalyzer = new ThreatAnalyzer();
@@ -75,10 +70,10 @@ namespace RunAnalyzer
             }
         }
 
-        private static MapDocument LoadMap(string mapPath)
+        private static Map LoadMap(string mapPath)
         {
             string json = File.ReadAllText(mapPath);
-            MapDocument map = JsonConvert.DeserializeObject<MapDocument>(json);
+            Map map = JsonConvert.DeserializeObject<Map>(json);
             if (map == null || map.Threats == null || map.Threats.Count == 0)
             {
                 throw new InvalidDataException("Map JSON does not contain any threats: " + mapPath);
