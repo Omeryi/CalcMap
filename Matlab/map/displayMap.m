@@ -4,10 +4,6 @@ if nargin < 7
     threats = [];
 end
 
-if isempty(threats) && isappdata(0, 'CalcMapThreats')
-    threats = getappdata(0, 'CalcMapThreats');
-end
-
 axes(ax)
 
 cla(ax)  % clear previous plots
@@ -34,16 +30,7 @@ for i = 1:numel(threats)
         continue
     end
 
-    if isfield(threats(i),"Id")
-        idText = char(string(threats(i).Id));
-        if numel(idText) > 8
-            label = idText(1:8);
-        else
-            label = idText;
-        end
-    else
-        label = sprintf("T%d", i);
-    end
+    label = sprintf("T%d", i);
 
     text(ax, threats(i).CenterX, threats(i).CenterY, label, ...
         "Color", [0 0 0], ...

@@ -37,7 +37,6 @@ ymin = params.YMin;
 ymax = params.YMax;
 
 threats = data.Threats;
-setappdata(0, 'CalcMapThreats', threats);
 
 if isempty(threats)
     error('readMap:NoThreats', ...
