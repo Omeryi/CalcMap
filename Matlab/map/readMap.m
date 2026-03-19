@@ -55,6 +55,8 @@ end
 nx = round((xmax-xmin)/res)+1;
 ny = round((ymax-ymin)/res)+1;
 
+% Build one global grid for the whole map, then stamp each threat image
+% into it at the threat's world-space position.
 map = zeros(ny,nx);
 
 for t = 1:length(threats)
@@ -80,7 +82,9 @@ for t = 1:length(threats)
             gy = iy+i-1;
 
             if gx>=1 && gx<=nx && gy>=1 && gy<=ny
-                map(gy,gx) = max(map(gy,gx),img(i,j));
+                % Overlapping threats add together visually, but the display
+                % is capped at 1 so the heatmap stays in a fixed range.
+                map(gy,gx) = min(1, map(gy,gx) + img(i,j));
             end
 
         end

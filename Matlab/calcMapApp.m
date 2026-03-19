@@ -32,6 +32,7 @@ classdef calcMapApp < matlab.apps.AppBase
                 return
             end
 
+            % Keep all rendering inside drawMap so callbacks only manage state.
             drawMap(app.UIAxes, app.Map, app.Path);
         end
 
@@ -114,6 +115,8 @@ classdef calcMapApp < matlab.apps.AppBase
             try
                 currentResolution = getPathResolution(app.Path);
                 threatResolution = getThreatResolution(app.Map.Threats);
+                % Use a coarser saved path by default so exported paths do not
+                % oversample relative to the threat grid.
                 defaultSpacing = 2 * threatResolution;
                 if ~isfinite(defaultSpacing) || defaultSpacing <= 0
                     defaultSpacing = currentResolution;

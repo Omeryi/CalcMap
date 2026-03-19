@@ -6,12 +6,17 @@ end
 
 axes(ax)
 
-cla(ax)  % clear previous plots
+% Redraw from scratch so labels, outlines, and paths stay in sync.
+cla(ax)
 
 imagesc(ax,[xmin xmax],[ymin ymax],map)
 
 axis(ax,"xy")
 axis(ax,"equal")
+xlim(ax, [xmin xmax])
+ylim(ax, [ymin ymax])
+ax.XLimMode = "manual";
+ax.YLimMode = "manual";
 
 colormap(ax,"hot")  % good for threat heatmaps
 
@@ -28,6 +33,18 @@ hold(ax,"on")
 for i = 1:numel(threats)
     if ~isfield(threats(i),"CenterX") || ~isfield(threats(i),"CenterY")
         continue
+    end
+
+    % Draw the nominal threat footprint so overlaps remain visible even
+    % when the heatmap saturates.
+    if isfield(threats(i), "Radius") && isfinite(threats(i).Radius) && threats(i).Radius > 0
+        theta = linspace(0, 2 * pi, 100);
+        circleX = threats(i).CenterX + threats(i).Radius * cos(theta);
+        circleY = threats(i).CenterY + threats(i).Radius * sin(theta);
+        plot(ax, circleX, circleY, ...
+            "Color", [0 0.2 0.8], ...
+            "LineWidth", 0.75, ...
+            "Clipping", "on");
     end
 
     label = sprintf("T%d", i);
