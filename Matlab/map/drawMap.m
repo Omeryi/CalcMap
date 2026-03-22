@@ -1,7 +1,10 @@
-function drawMap(ax, mapState, pathPoints)
+function lineHandle = drawMap(ax, mapState, pathPoints, renderOptions)
 
 if nargin < 3
     pathPoints = [];
+end
+if nargin < 4
+    renderOptions = struct();
 end
 
 % Compose the base heatmap first, then overlay the current path.
@@ -11,9 +14,10 @@ displayMap(ax, ...
     mapState.XMax, ...
     mapState.YMin, ...
     mapState.YMax, ...
-    mapState.Threats);
+    mapState.Threats, ...
+    renderOptions);
 
-drawPath(ax, pathPoints);
+lineHandle = drawPath(ax, pathPoints);
 title(ax, "Map: " + formatMapDisplayName(mapState));
 
 end

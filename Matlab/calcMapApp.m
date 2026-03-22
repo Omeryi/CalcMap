@@ -9,6 +9,8 @@ classdef calcMapApp < matlab.apps.AppBase
         SavePathButton matlab.ui.control.Button
         LoadPathButton matlab.ui.control.Button
         AnalyzeButton matlab.ui.control.Button
+        ResetButton matlab.ui.control.Button
+        ThreatLabelsCheckBox matlab.ui.control.CheckBox
         StatusLabel matlab.ui.control.Label
     end
 
@@ -17,6 +19,9 @@ classdef calcMapApp < matlab.apps.AppBase
         Path = []
         CurrentPathFile = ""
         GenerationParams = []
+        RenderedMapFile = ""
+        RenderedShowThreatLabels = false
+        PathLineHandle = []
     end
 
     methods (Access = private)
@@ -25,15 +30,70 @@ classdef calcMapApp < matlab.apps.AppBase
             app.StatusLabel.Text = "Status: " + string(message);
         end
 
-        function renderScene(app)
+        function renderScene(app, forceFullRedraw)
+            if nargin < 2
+                forceFullRedraw = false;
+            end
+
             if isempty(app.Map)
                 cla(app.UIAxes);
+                colorbar(app.UIAxes, "off");
                 title(app.UIAxes, "Map");
+                xlabel(app.UIAxes, "X");
+                ylabel(app.UIAxes, "Y");
+                app.clearRenderCache();
                 return
             end
 
-            % Keep all rendering inside drawMap so callbacks only manage state.
-            drawMap(app.UIAxes, app.Map, app.Path);
+            mapFile = string(app.Map.JsonFile);
+            showThreatLabels = logical(app.ThreatLabelsCheckBox.Value);
+            needsFullRedraw = forceFullRedraw ...
+                || strlength(app.RenderedMapFile) == 0 ...
+                || mapFile ~= app.RenderedMapFile ...
+                || showThreatLabels ~= app.RenderedShowThreatLabels;
+
+            if needsFullRedraw
+                % Rebuild the static map layers only when the source map or overlay mode changes.
+                app.PathLineHandle = drawMap(app.UIAxes, app.Map, app.Path, app.buildRenderOptions());
+                app.RenderedMapFile = mapFile;
+                app.RenderedShowThreatLabels = showThreatLabels;
+                return
+            end
+
+            app.refreshPathOverlay();
+        end
+
+        function renderOptions = buildRenderOptions(app)
+            renderOptions = struct( ...
+                "ShowThreatLabels", logical(app.ThreatLabelsCheckBox.Value));
+        end
+
+        function refreshPathOverlay(app)
+            if ~isempty(app.PathLineHandle) && isgraphics(app.PathLineHandle)
+                delete(app.PathLineHandle);
+            end
+
+            app.PathLineHandle = drawPath(app.UIAxes, app.Path);
+            title(app.UIAxes, "Map: " + formatMapDisplayName(app.Map));
+        end
+
+        function clearRenderCache(app)
+            if ~isempty(app.PathLineHandle) && isgraphics(app.PathLineHandle)
+                delete(app.PathLineHandle);
+            end
+
+            app.RenderedMapFile = "";
+            app.RenderedShowThreatLabels = false;
+            app.PathLineHandle = [];
+        end
+
+        function resetScene(app)
+            app.Map = [];
+            app.Path = [];
+            app.CurrentPathFile = "";
+            app.ThreatLabelsCheckBox.Value = false;
+            app.clearRenderCache();
+            app.renderScene(true);
         end
 
         function LoadMapButtonPushed(app, ~)
@@ -47,7 +107,8 @@ classdef calcMapApp < matlab.apps.AppBase
                 app.Map = loadMap(selectedFile);
                 app.Path = [];
                 app.CurrentPathFile = "";
-                app.renderScene();
+                app.clearRenderCache();
+                app.renderScene(true);
                 app.updateStatus("Loaded map: " + app.Map.Name);
             catch ME
                 uialert(app.UIFigure, string(ME.message), "Load map failed");
@@ -67,7 +128,8 @@ classdef calcMapApp < matlab.apps.AppBase
                 app.Map = generateMap(getRepoRoot(), params);
                 app.Path = [];
                 app.CurrentPathFile = "";
-                app.renderScene();
+                app.clearRenderCache();
+                app.renderScene(true);
                 app.updateStatus("Generated map: " + app.Map.Name);
             catch ME
                 uialert(app.UIFigure, string(ME.message), "Generate map failed");
@@ -83,7 +145,7 @@ classdef calcMapApp < matlab.apps.AppBase
 
             try
                 app.updateStatus("Drawing path...");
-                points = collectPathPoints(app.UIFigure, app.UIAxes, app.Map.Name, app.Map, app.Path);
+                points = collectPathPoints(app.UIFigure, app.UIAxes, app.Map.Name, app.Map, app.Path, app.buildRenderOptions());
                 if isempty(points)
                     app.renderScene();
                     app.updateStatus("Draw path cancelled");
@@ -96,7 +158,7 @@ classdef calcMapApp < matlab.apps.AppBase
                 app.updateStatus("Path updated");
             catch ME
                 uialert(app.UIFigure, string(ME.message), "Draw path failed");
-                app.renderScene();
+                app.renderScene(true);
                 app.updateStatus("Draw path failed");
             end
         end
@@ -132,7 +194,7 @@ classdef calcMapApp < matlab.apps.AppBase
                 app.Path = savedPath;
                 app.CurrentPathFile = string(savedFile);
                 app.renderScene();
-                app.updateStatus("Saved path: " + app.CurrentPathFile);
+                app.updateStatus(sprintf("Saved path (spacing %.3f): %s", spacing, char(app.CurrentPathFile)));
             catch ME
                 uialert(app.UIFigure, string(ME.message), "Save path failed");
                 app.updateStatus("Save path failed");
@@ -159,6 +221,24 @@ classdef calcMapApp < matlab.apps.AppBase
             catch ME
                 uialert(app.UIFigure, string(ME.message), "Load path failed");
                 app.updateStatus("Load path failed");
+            end
+        end
+
+        function ResetButtonPushed(app, ~)
+            app.resetScene();
+            app.updateStatus("Reset map and path state");
+        end
+
+        function ThreatLabelsCheckBoxValueChanged(app, ~)
+            if isempty(app.Map)
+                return
+            end
+
+            app.renderScene(true);
+            if app.ThreatLabelsCheckBox.Value
+                app.updateStatus("Threat labels shown");
+            else
+                app.updateStatus("Threat labels hidden");
             end
         end
 
@@ -228,8 +308,19 @@ classdef calcMapApp < matlab.apps.AppBase
             app.AnalyzeButton.Text = "Analyze";
             app.AnalyzeButton.ButtonPushedFcn = createCallbackFcn(app, @AnalyzeButtonPushed, true);
 
+            app.ResetButton = uibutton(app.UIFigure, "push");
+            app.ResetButton.Position = [30 310 180 40];
+            app.ResetButton.Text = "Reset";
+            app.ResetButton.ButtonPushedFcn = createCallbackFcn(app, @ResetButtonPushed, true);
+
+            app.ThreatLabelsCheckBox = uicheckbox(app.UIFigure);
+            app.ThreatLabelsCheckBox.Position = [30 270 180 22];
+            app.ThreatLabelsCheckBox.Text = "Show Threat Labels";
+            app.ThreatLabelsCheckBox.Value = false;
+            app.ThreatLabelsCheckBox.ValueChangedFcn = createCallbackFcn(app, @ThreatLabelsCheckBoxValueChanged, true);
+
             app.StatusLabel = uilabel(app.UIFigure);
-            app.StatusLabel.Position = [30 30 180 300];
+            app.StatusLabel.Position = [30 30 180 220];
             app.StatusLabel.WordWrap = "on";
             app.StatusLabel.VerticalAlignment = "top";
             app.StatusLabel.Text = "Status: Ready";

@@ -13,7 +13,7 @@ pathResolution = getPathResolution(pathPoints);
 threatResolution = getThreatResolution(mapState.Threats);
 mapGuid = getMapGuid(mapState);
 
-columnWidths = [300 130 130 120];
+columnWidths = [90 300 130 130 120];
 tableWidth = sum(columnWidths);
 tableHeight = min(14, size(tableData, 1)) * 22 + 28;
 figureWidth = max(tableWidth + 40, 980);
@@ -41,8 +41,9 @@ summaryLabel2.Text = sprintf("Path length: %.3f | Path resolution: %.3f | Threat
 
 resultsTable = uitable(resultsFigure);
 resultsTable.Position = [20 56 tableWidth tableHeight];
-resultsTable.ColumnName = {"Threat Id", "Center X", "Center Y", "Grade"};
+resultsTable.ColumnName = {"Threat #", "Threat Id", "Center X", "Center Y", "Grade"};
 resultsTable.ColumnWidth = num2cell(columnWidths);
+resultsTable.ColumnFormat = {'char', 'char', 'numeric', 'numeric', 'numeric'};
 resultsTable.Data = tableData;
 
 closeButton = uibutton(resultsFigure, "push");
@@ -55,7 +56,7 @@ end
 function [tableData, totalMs] = buildAnalysisTableData(analysisOutput, mapState)
 
 totalMs = 0;
-tableData = cell(0, 4);
+tableData = cell(0, 5);
 if isempty(analysisOutput) || ~isfield(analysisOutput, "Results") || isempty(analysisOutput.Results)
     return
 end
@@ -70,25 +71,40 @@ if isscalar(results)
     results = results(:);
 end
 
-tableData = cell(numel(results), 4);
-for i = 1:numel(results)
-    [centerX, centerY] = getThreatCenter(mapState.Threats, results(i).Id);
-    tableData{i, 1} = char(string(results(i).Id));
-    tableData{i, 2} = centerX;
-    tableData{i, 3} = centerY;
-    tableData{i, 4} = results(i).Grade;
+rowCount = numel(results);
+tableData = cell(rowCount, 5);
+gradeValues = NaN(rowCount, 1);
+
+for i = 1:rowCount
+    [centerX, centerY, threatNumber] = getThreatCenter(mapState.Threats, results(i).Id);
+    if isnan(threatNumber)
+        tableData{i, 1} = '';
+    else
+        tableData{i, 1} = sprintf('T%d', threatNumber);
+    end
+
+    tableData{i, 2} = char(string(results(i).Id));
+    tableData{i, 3} = double(centerX);
+    tableData{i, 4} = double(centerY);
+    gradeValues(i) = double(results(i).Grade);
+    tableData{i, 5} = gradeValues(i);
 end
+
+[~, sortOrder] = sort(gradeValues, "descend");
+tableData = tableData(sortOrder, :);
 
 end
 
-function [centerX, centerY] = getThreatCenter(threats, threatId)
+function [centerX, centerY, threatNumber] = getThreatCenter(threats, threatId)
 
 centerX = NaN;
 centerY = NaN;
+threatNumber = NaN;
 for i = 1:numel(threats)
     if strcmp(char(string(threats(i).Id)), char(string(threatId)))
         centerX = threats(i).CenterX;
         centerY = threats(i).CenterY;
+        threatNumber = i;
         return
     end
 end

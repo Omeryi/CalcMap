@@ -1,7 +1,10 @@
-function points = collectPathPoints(fig, ax, mapName, mapState, existingPath)
+function points = collectPathPoints(fig, ax, mapName, mapState, existingPath, renderOptions)
 
 if nargin < 5
     existingPath = [];
+end
+if nargin < 6
+    renderOptions = struct();
 end
 
 mapLabel = string(mapName);
@@ -12,7 +15,7 @@ if nargin >= 4 && ~isempty(mapState)
     end
 end
 
-drawMap(ax, mapState, existingPath);
+drawMap(ax, mapState, existingPath, renderOptions);
 title(ax, "Map: " + mapLabel + " | Click points, ENTER to finish, ESC to cancel");
 
 originalButtonDownFcn = fig.WindowButtonDownFcn;

@@ -9,21 +9,24 @@ if nargin < 2 || ~isfinite(currentResolution) || currentResolution <= 0
 end
 
 prompt = {sprintf("Path resolution / spacing between saved points (default %.3f, current average %.3f)", defaultResolution, currentResolution)};
-answer = inputdlg(prompt, "Save Path Resolution", [1 60], {num2str(defaultResolution)});
-if isempty(answer)
-    ok = false;
-    spacing = NaN;
-    return
-end
+defaultAnswer = {num2str(defaultResolution)};
 
-spacing = str2double(answer{1});
-if isnan(spacing) || ~isfinite(spacing) || spacing <= 0
-    errordlg("Resolution must be a positive number.", "Invalid resolution", "modal");
-    ok = false;
-    spacing = NaN;
-    return
-end
+while true
+    answer = inputdlg(prompt, "Save Path Resolution", [1 60], defaultAnswer);
+    if isempty(answer)
+        ok = false;
+        spacing = NaN;
+        return
+    end
 
-ok = true;
+    spacing = str2double(answer{1});
+    if isfinite(spacing) && spacing > 0
+        ok = true;
+        return
+    end
+
+    defaultAnswer = answer;
+    uiwait(errordlg("Resolution must be a positive number.", "Invalid resolution", "modal"));
+end
 
 end
