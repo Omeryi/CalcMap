@@ -19,9 +19,7 @@ classdef calcMapApp < matlab.apps.AppBase
         Path = []
         CurrentPathFile = ""
         GenerationParams = []
-        RenderedMapFile = ""
-        RenderedShowThreatLabels = false
-        PathLineHandle = []
+        RenderCache = struct()
     end
 
     methods (Access = private)
@@ -30,37 +28,17 @@ classdef calcMapApp < matlab.apps.AppBase
             app.StatusLabel.Text = "Status: " + string(message);
         end
 
-        function renderScene(app, forceFullRedraw)
-            if nargin < 2
-                forceFullRedraw = false;
-            end
-
+        function renderScene(app)
             if isempty(app.Map)
-                cla(app.UIAxes);
-                colorbar(app.UIAxes, "off");
+                app.clearRenderCache();
                 title(app.UIAxes, "Map");
                 xlabel(app.UIAxes, "X");
                 ylabel(app.UIAxes, "Y");
-                app.clearRenderCache();
                 return
             end
 
-            mapFile = string(app.Map.JsonFile);
-            showThreatLabels = logical(app.ThreatLabelsCheckBox.Value);
-            needsFullRedraw = forceFullRedraw ...
-                || strlength(app.RenderedMapFile) == 0 ...
-                || mapFile ~= app.RenderedMapFile ...
-                || showThreatLabels ~= app.RenderedShowThreatLabels;
-
-            if needsFullRedraw
-                % Rebuild the static map layers only when the source map or overlay mode changes.
-                app.PathLineHandle = drawMap(app.UIAxes, app.Map, app.Path, app.buildRenderOptions());
-                app.RenderedMapFile = mapFile;
-                app.RenderedShowThreatLabels = showThreatLabels;
-                return
-            end
-
-            app.refreshPathOverlay();
+            app.RenderCache = renderCachedMap(app.UIAxes, app.Map, app.RenderCache, app.buildRenderOptions());
+            app.RenderCache = updatePathOverlay(app.UIAxes, app.RenderCache, app.Map, app.Path);
         end
 
         function renderOptions = buildRenderOptions(app)
@@ -68,23 +46,31 @@ classdef calcMapApp < matlab.apps.AppBase
                 "ShowThreatLabels", logical(app.ThreatLabelsCheckBox.Value));
         end
 
-        function refreshPathOverlay(app)
-            if ~isempty(app.PathLineHandle) && isgraphics(app.PathLineHandle)
-                delete(app.PathLineHandle);
-            end
-
-            app.PathLineHandle = drawPath(app.UIAxes, app.Path);
-            title(app.UIAxes, "Map: " + formatMapDisplayName(app.Map));
+        function renderCache = emptyRenderCache(app) %#ok<MANU>
+            renderCache = struct( ...
+                "MapKey", "", ...
+                "ImageHandle", [], ...
+                "OutlineHandle", [], ...
+                "LabelHandles", [], ...
+                "PathHaloHandle", [], ...
+                "PathHandle", [], ...
+                "ShowThreatLabels", false);
         end
 
         function clearRenderCache(app)
-            if ~isempty(app.PathLineHandle) && isgraphics(app.PathLineHandle)
-                delete(app.PathLineHandle);
+            if isempty(app.RenderCache) || ~isstruct(app.RenderCache)
+                app.RenderCache = app.emptyRenderCache();
             end
 
-            app.RenderedMapFile = "";
-            app.RenderedShowThreatLabels = false;
-            app.PathLineHandle = [];
+            if isfield(app.RenderCache, "ImageHandle") ...
+                    && ~isempty(app.RenderCache.ImageHandle) ...
+                    && isgraphics(app.RenderCache.ImageHandle)
+                delete(app.RenderCache.ImageHandle);
+            end
+
+            cla(app.UIAxes);
+            colorbar(app.UIAxes, "off");
+            app.RenderCache = app.emptyRenderCache();
         end
 
         function resetScene(app)
@@ -93,7 +79,7 @@ classdef calcMapApp < matlab.apps.AppBase
             app.CurrentPathFile = "";
             app.ThreatLabelsCheckBox.Value = false;
             app.clearRenderCache();
-            app.renderScene(true);
+            app.renderScene();
         end
 
         function LoadMapButtonPushed(app, ~)
@@ -108,7 +94,7 @@ classdef calcMapApp < matlab.apps.AppBase
                 app.Path = [];
                 app.CurrentPathFile = "";
                 app.clearRenderCache();
-                app.renderScene(true);
+                app.renderScene();
                 app.updateStatus("Loaded map: " + app.Map.Name);
             catch ME
                 uialert(app.UIFigure, string(ME.message), "Load map failed");
@@ -129,7 +115,7 @@ classdef calcMapApp < matlab.apps.AppBase
                 app.Path = [];
                 app.CurrentPathFile = "";
                 app.clearRenderCache();
-                app.renderScene(true);
+                app.renderScene();
                 app.updateStatus("Generated map: " + app.Map.Name);
             catch ME
                 uialert(app.UIFigure, string(ME.message), "Generate map failed");
@@ -158,7 +144,7 @@ classdef calcMapApp < matlab.apps.AppBase
                 app.updateStatus("Path updated");
             catch ME
                 uialert(app.UIFigure, string(ME.message), "Draw path failed");
-                app.renderScene(true);
+                app.renderScene();
                 app.updateStatus("Draw path failed");
             end
         end
@@ -177,9 +163,9 @@ classdef calcMapApp < matlab.apps.AppBase
             try
                 currentResolution = getPathResolution(app.Path);
                 threatResolution = getThreatResolution(app.Map.Threats);
-                % Use a coarser saved path by default so exported paths do not
-                % oversample relative to the threat grid.
-                defaultSpacing = 2 * threatResolution;
+                % Default to the threat resolution without inventing extra
+                % points for already coarse paths.
+                defaultSpacing = max(currentResolution, threatResolution);
                 if ~isfinite(defaultSpacing) || defaultSpacing <= 0
                     defaultSpacing = currentResolution;
                 end
@@ -234,7 +220,7 @@ classdef calcMapApp < matlab.apps.AppBase
                 return
             end
 
-            app.renderScene(true);
+            app.renderScene();
             if app.ThreatLabelsCheckBox.Value
                 app.updateStatus("Threat labels shown");
             else
@@ -334,6 +320,7 @@ classdef calcMapApp < matlab.apps.AppBase
         function app = calcMapApp
             app.configureLogicPaths();
             app.GenerationParams = defaultGenerationParams();
+            app.RenderCache = app.emptyRenderCache();
             createComponents(app);
             registerApp(app, app.UIFigure);
 

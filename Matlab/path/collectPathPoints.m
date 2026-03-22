@@ -15,7 +15,8 @@ if nargin >= 4 && ~isempty(mapState)
     end
 end
 
-drawMap(ax, mapState, existingPath, renderOptions);
+renderCache = renderCachedMap(ax, mapState, struct(), renderOptions);
+renderCache = updatePathOverlay(ax, renderCache, mapState, existingPath);
 title(ax, "Map: " + mapLabel + " | Click points, ENTER to finish, ESC to cancel");
 
 originalButtonDownFcn = fig.WindowButtonDownFcn;
@@ -34,7 +35,6 @@ ax.XLimMode = "manual";
 ax.YLimMode = "manual";
 xlim(ax, xLimits);
 ylim(ax, yLimits);
-tempPlot = plot(ax, NaN, NaN, "c-", "LineWidth", 1);
 cleanupObj = onCleanup(@restoreInteractionState); %#ok<NASGU>
 
 fig.Pointer = "crosshair";
@@ -45,10 +45,6 @@ try
     uiwait(fig);
 catch
     cancelled = true;
-end
-
-if isgraphics(tempPlot)
-    delete(tempPlot);
 end
 
 if cancelled
@@ -70,10 +66,7 @@ end
         end
 
         points(end + 1, :) = point; %#ok<AGROW>
-        if isgraphics(tempPlot)
-            tempPlot.XData = points(:, 1);
-            tempPlot.YData = points(:, 2);
-        end
+        renderCache = updatePathOverlay(ax, renderCache, mapState, points);
     end
 
     function handleKeyPress(~, event)

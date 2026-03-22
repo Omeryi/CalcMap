@@ -1,4 +1,4 @@
-function [map,xmin,xmax,ymin,ymax] = readMap(file)
+function [map,xmin,xmax,ymin,ymax,data] = readMap(file, maxRows, maxCols)
 
 txt = fileread(file);
 data = jsondecode(txt);
@@ -52,43 +52,59 @@ else
         'Map JSON in "%s" is missing "Resolution" in threats or parameters.', file);
 end
 
-nx = round((xmax-xmin)/res)+1;
-ny = round((ymax-ymin)/res)+1;
+if nargin < 2 || isempty(maxRows) || maxRows < 1
+    maxRows = inf;
+end
+if nargin < 3 || isempty(maxCols) || maxCols < 1
+    maxCols = inf;
+end
+
+displayRes = max(res, max((xmax - xmin) / max(maxCols - 1, 1), (ymax - ymin) / max(maxRows - 1, 1)));
+nx = round((xmax - xmin) / displayRes) + 1;
+ny = round((ymax - ymin) / displayRes) + 1;
 
 % Build one global grid for the whole map, then stamp each threat image
 % into it at the threat's world-space position.
-map = zeros(ny,nx);
+map = zeros(ny, nx, 'single');
 
 for t = 1:length(threats)
 
-    img = threats(t).Image;
+    img = single(threats(t).Image);
 
     cx = threats(t).CenterX;
     cy = threats(t).CenterY;
     r = threats(t).Radius;
 
-    imgSize = size(img,1);
+    imgHeight = size(img, 1);
+    imgWidth = size(img, 2);
+    displayHeight = max(1, round(((imgHeight - 1) * res) / displayRes) + 1);
+    displayWidth = max(1, round(((imgWidth - 1) * res) / displayRes) + 1);
+
+    rowIndex = unique(round(linspace(1, imgHeight, displayHeight)));
+    colIndex = unique(round(linspace(1, imgWidth, displayWidth)));
+    displayImg = img(rowIndex, colIndex);
 
     xs = cx - r;
     ys = cy - r;
 
-    ix = round((xs-xmin)/res)+1;
-    iy = round((ys-ymin)/res)+1;
+    ix = round((xs - xmin) / displayRes) + 1;
+    iy = round((ys - ymin) / displayRes) + 1;
 
-    for i=1:imgSize
-        for j=1:imgSize
-
-            gx = ix+j-1;
-            gy = iy+i-1;
-
-            if gx>=1 && gx<=nx && gy>=1 && gy<=ny
-                % Overlapping threats add together visually, but the display
-                % is capped at 1 so the heatmap stays in a fixed range.
-                map(gy,gx) = min(1, map(gy,gx) + img(i,j));
-            end
-
-        end
+    xRange = ix:(ix + size(displayImg, 2) - 1);
+    yRange = iy:(iy + size(displayImg, 1) - 1);
+    validX = xRange >= 1 & xRange <= nx;
+    validY = yRange >= 1 & yRange <= ny;
+    if ~any(validX) || ~any(validY)
+        continue
     end
+
+    clippedX = xRange(validX);
+    clippedY = yRange(validY);
+    clippedImg = displayImg(validY, validX);
+
+    % Overlapping threats add together visually, but the display
+    % is capped at 1 so the heatmap stays in a fixed range.
+    map(clippedY, clippedX) = min(1, map(clippedY, clippedX) + clippedImg);
 
 end
 

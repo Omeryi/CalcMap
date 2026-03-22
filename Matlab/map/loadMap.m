@@ -1,56 +1,85 @@
 function mapState = loadMap(filename)
 
 filename = char(string(filename));
-[mapMatrix, xmin, xmax, ymin, ymax] = readMap(filename);
-mapMatrix = optimizeDisplayMatrix(single(mapMatrix));
-mapJson = jsondecode(fileread(filename));
 [folder, name, ~] = fileparts(filename);
 [~, folderName] = fileparts(folder);
+cacheFile = fullfile(folder, "map_cache_fast.mat");
+displayMaxRows = 900;
+displayMaxCols = 1200;
+cacheVersion = 2;
+sourceInfo = dir(filename);
+cacheInfo = dir(cacheFile);
+useCache = false;
+if ~isempty(cacheInfo) && ~isempty(sourceInfo) && cacheInfo.datenum >= sourceInfo.datenum
+    cacheData = load(cacheFile);
+    useCache = isfield(cacheData, "CacheVersion") ...
+        && cacheData.CacheVersion == cacheVersion ...
+        && isfield(cacheData, "DisplayMaxRows") ...
+        && cacheData.DisplayMaxRows == displayMaxRows ...
+        && isfield(cacheData, "DisplayMaxCols") ...
+        && cacheData.DisplayMaxCols == displayMaxCols;
+end
 
-if isfield(mapJson, "Threats")
-    threats = extractThreatDisplayData(mapJson.Threats);
+loadTimer = tic;
+if useCache
+    fprintf("loadMap: using cache %s\n", cacheFile);
+    mapImage = cacheData.MapImage;
+    xmin = cacheData.XMin;
+    xmax = cacheData.XMax;
+    ymin = cacheData.YMin;
+    ymax = cacheData.YMax;
+    threats = cacheData.Threats;
+    if isfield(cacheData, "ThreatResolution")
+        threatResolution = cacheData.ThreatResolution;
+    else
+        threatResolution = getThreatResolution(threats);
+    end
+    fprintf("loadMap: cache load %.3f s\n", toc(loadTimer));
 else
-    threats = struct([]);
+    fprintf("loadMap: preprocessing %s\n", filename);
+    preprocessTimer = tic;
+    [mapImage, xmin, xmax, ymin, ymax, mapJson] = readMap(filename, displayMaxRows, displayMaxCols);
+
+    if isfield(mapJson, "Threats")
+        threats = extractThreatDisplayData(mapJson.Threats);
+    else
+        threats = struct([]);
+    end
+
+    threatResolution = getThreatResolution(threats);
+    preprocessElapsed = toc(preprocessTimer);
+    fprintf("loadMap: preprocess %.3f s\n", preprocessElapsed);
+
+    MapImage = mapImage;
+    XMin = xmin;
+    XMax = xmax;
+    YMin = ymin;
+    YMax = ymax;
+    Threats = threats;
+    ThreatResolution = threatResolution;
+    CacheVersion = cacheVersion;
+    DisplayMaxRows = displayMaxRows;
+    DisplayMaxCols = displayMaxCols;
+    save(cacheFile, "MapImage", "XMin", "XMax", "YMin", "YMax", "Threats", ...
+        "ThreatResolution", "CacheVersion", "DisplayMaxRows", "DisplayMaxCols", "-v7");
+    fprintf("loadMap: saved cache %s\n", cacheFile);
+    fprintf("loadMap: total load %.3f s\n", toc(loadTimer));
 end
 
 mapState = struct( ...
-    "Matrix", mapMatrix, ...
+    "BaseImage", mapImage, ...
+    "DisplayImage", mapImage, ...
     "XMin", xmin, ...
     "XMax", xmax, ...
     "YMin", ymin, ...
     "YMax", ymax, ...
     "Threats", threats, ...
+    "ThreatResolution", threatResolution, ...
     "Folder", string(folder), ...
     "Guid", string(folderName), ...
+    "CacheFile", string(cacheFile), ...
     "JsonFile", string(filename), ...
     "Name", string(name));
-
-end
-
-function mapMatrix = optimizeDisplayMatrix(mapMatrix)
-
-if isempty(mapMatrix)
-    return
-end
-
-maxRows = 900;
-maxCols = 1200;
-[rowCount, colCount] = size(mapMatrix);
-stride = max(1, ceil(max(rowCount / maxRows, colCount / maxCols)));
-if stride == 1
-    return
-end
-
-rowIndex = 1:stride:rowCount;
-colIndex = 1:stride:colCount;
-if rowIndex(end) ~= rowCount
-    rowIndex(end + 1) = rowCount;
-end
-if colIndex(end) ~= colCount
-    colIndex(end + 1) = colCount;
-end
-
-mapMatrix = mapMatrix(rowIndex, colIndex);
 
 end
 
