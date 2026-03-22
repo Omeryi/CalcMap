@@ -173,16 +173,16 @@ namespace ns_ThreatAnalyzer
                     double tRange = tEnd - tStart;
                     double insideLength = tRange * edgeLength;
                     int sampleCount = (int)Math.Ceiling(insideLength / meta.Resolution);
-                    if (sampleCount < 1)
-                    {
-                        sampleCount = 1;
-                    }
+                    sampleCount = Math.Max(sampleCount, 1);
 
+                    // Parameter-space step between adjacent samples along the clipped segment.
                     double dt = tRange / sampleCount;
+                    // Real distance covered by each sample step along the portion inside the map.
                     double stepLength = insideLength / sampleCount;
 
-                    // Incremental stepping avoids recomputing p0 + t*(p1-p0) for every sample.
-                    double sampleT = tStart + (0.5 * dt);
+                    // Start at the beginning of the clipped interval and then advance incrementally
+                    // instead of recomputing p0 + t*(p1-p0) for every sample.
+                    double sampleT = tStart;
                     double sampleX = p0x + (sampleT * dx);
                     double sampleY = p0y + (sampleT * dy);
                     double stepX = dx * dt;
@@ -191,38 +191,30 @@ namespace ns_ThreatAnalyzer
                     double sampleSum = 0.0;
                     for (int sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++)
                     {
+                        // Convert the current sample position from map coordinates into the
+                        // nearest threat cell index using the image origin and resolution.
                         int ix = (int)Math.Round((sampleX - meta.ImageOriginX) * meta.InvResolution);
                         int iy = (int)Math.Round((sampleY - meta.ImageOriginY) * meta.InvResolution);
-                        if (ix < 0)
-                        {
-                            ix = 0;
-                        }
-                        else if (ix >= meta.ImageWidth)
-                        {
-                            ix = meta.ImageWidth - 1;
-                        }
 
+                        // Clamp x into the valid image column range.
+                        ix = Math.Max(ix, 0);
+                        ix = Math.Min(ix, meta.ImageWidth - 1);
+
+                        // Each x column stores its y samples in a jagged row array.
                         float[] row = meta.Image[ix];
-                        if (row != null && row.Length > 0)
-                        {
-                            if (iy < 0)
-                            {
-                                iy = 0;
-                            }
-                            else if (iy >= row.Length)
-                            {
-                                iy = row.Length - 1;
-                            }
+                        // Clamp y into the valid range for this column.
+                        iy = Math.Max(iy, 0);
+                        iy = Math.Min(iy, row.Length - 1);
 
-                            sampleSum += row[iy];
-                        }
+                        // Accumulate the threat value at this sampled cell.
+                        sampleSum += row[iy];
 
+                        // Advance to the next sample point along the segment.
                         sampleX += stepX;
                         sampleY += stepY;
                     }
 
-                    // Grade = sum of normalized edge costs.
-                    double edgeCost = (sampleSum * stepLength) / edgeLength;
+                    double edgeCost = (sampleSum / sampleCount) * edgeLength;
                     grades[threatIndex] += edgeCost;
                 }
             }
