@@ -163,14 +163,13 @@ classdef calcMapApp < matlab.apps.AppBase
             try
                 currentResolution = getPathResolution(app.Path);
                 threatResolution = getThreatResolution(app.Map.Threats);
-                % Default to the threat resolution without inventing extra
-                % points for already coarse paths.
-                defaultSpacing = max(currentResolution, threatResolution);
+                % Default to a path spacing that is twice the threat grid resolution.
+                defaultSpacing = 2 * threatResolution;
                 if ~isfinite(defaultSpacing) || defaultSpacing <= 0
                     defaultSpacing = currentResolution;
                 end
 
-                [ok, spacing] = promptPathResolution(defaultSpacing, currentResolution);
+                [ok, spacing] = promptPathResolution(defaultSpacing, currentResolution, threatResolution);
                 if ~ok
                     app.updateStatus("Save path cancelled");
                     return

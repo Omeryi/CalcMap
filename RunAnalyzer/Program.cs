@@ -98,6 +98,21 @@ namespace RunAnalyzer
                 throw new InvalidDataException("Path JSON does not contain any points: " + pathPath);
             }
 
+            for (int i = 0; i < points.Count; i++)
+            {
+                Point point = points[i];
+                if (point == null)
+                {
+                    throw new InvalidDataException("Path JSON contains a null point at index " + i + ": " + pathPath);
+                }
+
+                if (double.IsNaN(point.X) || double.IsInfinity(point.X)
+                    || double.IsNaN(point.Y) || double.IsInfinity(point.Y))
+                {
+                    throw new InvalidDataException("Path JSON contains a non-finite point at index " + i + ": " + pathPath);
+                }
+            }
+
             return points;
         }
 

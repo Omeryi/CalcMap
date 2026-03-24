@@ -99,24 +99,41 @@ template = struct( ...
 
 threats = repmat(template, numel(rawThreats), 1);
 for i = 1:numel(rawThreats)
-    if isfield(rawThreats, "Id")
-        threats(i).Id = char(string(rawThreats(i).Id));
+    if ~isfield(rawThreats, "Id")
+        error("loadMap:MissingThreatId", "Threat %d is missing required field Id.", i);
+    end
+    threats(i).Id = char(string(rawThreats(i).Id));
+
+    if ~isfield(rawThreats, "CenterX")
+        error("loadMap:MissingThreatCenterX", "Threat %d is missing required field CenterX.", i);
+    end
+    threats(i).CenterX = double(rawThreats(i).CenterX);
+
+    if ~isfield(rawThreats, "CenterY")
+        error("loadMap:MissingThreatCenterY", "Threat %d is missing required field CenterY.", i);
+    end
+    threats(i).CenterY = double(rawThreats(i).CenterY);
+
+    if ~isfield(rawThreats, "Radius")
+        error("loadMap:MissingThreatRadius", "Threat %d is missing required field Radius.", i);
+    end
+    threats(i).Radius = double(rawThreats(i).Radius);
+
+    if ~isfield(rawThreats, "Resolution")
+        error("loadMap:MissingThreatResolution", "Threat %d is missing required field Resolution.", i);
+    end
+    threats(i).Resolution = double(rawThreats(i).Resolution);
+
+    if ~isfinite(threats(i).CenterX) || ~isfinite(threats(i).CenterY)
+        error("loadMap:InvalidThreatCenter", "Threat %d must have finite CenterX and CenterY values.", i);
     end
 
-    if isfield(rawThreats, "CenterX")
-        threats(i).CenterX = double(rawThreats(i).CenterX);
+    if ~isfinite(threats(i).Radius) || threats(i).Radius <= 0
+        error("loadMap:InvalidThreatRadius", "Threat %d must have a positive finite radius.", i);
     end
 
-    if isfield(rawThreats, "CenterY")
-        threats(i).CenterY = double(rawThreats(i).CenterY);
-    end
-
-    if isfield(rawThreats, "Radius")
-        threats(i).Radius = double(rawThreats(i).Radius);
-    end
-
-    if isfield(rawThreats, "Resolution")
-        threats(i).Resolution = double(rawThreats(i).Resolution);
+    if ~isfinite(threats(i).Resolution) || threats(i).Resolution <= 0
+        error("loadMap:InvalidThreatResolution", "Threat %d must have a positive finite resolution.", i);
     end
 end
 

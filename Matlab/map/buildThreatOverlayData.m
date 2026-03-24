@@ -28,13 +28,15 @@ labelCount = 0;
 
 for i = 1:numel(threats)
     if ~isfield(threats(i), "CenterX") || ~isfield(threats(i), "CenterY")
-        continue
+        error("buildThreatOverlayData:MissingThreatCenter", ...
+            "Threat %d is missing required CenterX or CenterY.", i);
     end
 
     centerX = double(threats(i).CenterX);
     centerY = double(threats(i).CenterY);
     if ~isfinite(centerX) || ~isfinite(centerY)
-        continue
+        error("buildThreatOverlayData:InvalidThreatCenter", ...
+            "Threat %d must have finite CenterX and CenterY values.", i);
     end
 
     labelCount = labelCount + 1;
@@ -42,13 +44,21 @@ for i = 1:numel(threats)
     labelY(labelCount) = centerY;
     labelText{labelCount} = sprintf('T%d', i);
 
-    if isfield(threats(i), "Radius") && isfinite(threats(i).Radius) && threats(i).Radius > 0
-        radius = double(threats(i).Radius);
-        circleX = centerX + radius * cos(theta);
-        circleY = centerY + radius * sin(theta);
-        outlineSegmentsX{end + 1, 1} = [circleX, NaN]; %#ok<AGROW>
-        outlineSegmentsY{end + 1, 1} = [circleY, NaN]; %#ok<AGROW>
+    if ~isfield(threats(i), "Radius")
+        error("buildThreatOverlayData:MissingThreatRadius", ...
+            "Threat %d is missing required Radius.", i);
     end
+
+    if ~isfinite(threats(i).Radius) || threats(i).Radius <= 0
+        error("buildThreatOverlayData:InvalidThreatRadius", ...
+            "Threat %d must have a positive finite Radius.", i);
+    end
+
+    radius = double(threats(i).Radius);
+    circleX = centerX + radius * cos(theta);
+    circleY = centerY + radius * sin(theta);
+    outlineSegmentsX{end + 1, 1} = [circleX, NaN]; %#ok<AGROW>
+    outlineSegmentsY{end + 1, 1} = [circleY, NaN]; %#ok<AGROW>
 end
 
 if ~isempty(outlineSegmentsX)

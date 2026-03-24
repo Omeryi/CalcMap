@@ -1,14 +1,28 @@
-function [ok, spacing] = promptPathResolution(defaultResolution, currentResolution)
+function [ok, spacing] = promptPathResolution(defaultResolution, currentResolution, threatResolution)
 
 if nargin < 1 || ~isfinite(defaultResolution) || defaultResolution <= 0
-    defaultResolution = 1;
+    error("promptPathResolution:InvalidDefaultResolution", ...
+        "Default path resolution must be a positive finite number.");
 end
 
-if nargin < 2 || ~isfinite(currentResolution) || currentResolution <= 0
-    currentResolution = 1;
+if nargin < 2
+    currentResolution = NaN;
 end
 
-prompt = {sprintf("Path resolution / spacing between saved points (default %.3f, current average %.3f)", defaultResolution, currentResolution)};
+if nargin < 3 || ~isfinite(threatResolution) || threatResolution <= 0
+    error("promptPathResolution:InvalidThreatResolution", ...
+        "Threat resolution must be a positive finite number.");
+end
+
+currentResolutionText = "n/a";
+if isfinite(currentResolution) && currentResolution > 0
+    currentResolutionText = sprintf("%.3f", currentResolution);
+end
+
+prompt = {sprintf([ ...
+    'Path resolution / spacing between saved points ' ...
+    '(threat resolution %.3f, default path resolution %.3f, current average %s)'], ...
+    threatResolution, defaultResolution, currentResolutionText)};
 defaultAnswer = {num2str(defaultResolution)};
 
 while true

@@ -5,9 +5,9 @@ if ~isfile(exe)
     error("generateMap:MissingExecutable", "MapGenerator.exe was not found: %s", exe);
 end
 
-argText = sprintf("%.15g %.15g %.15g %.15g %d %.15g %.15g", ...
+argText = sprintf("%.15g %.15g %.15g %.15g %d %.15g %.15g %.15g", ...
     params.XMin, params.XMax, params.YMin, params.YMax, ...
-    params.RegionCount, params.RadiusMin, params.RadiusMax);
+    params.RegionCount, params.RadiusMin, params.RadiusMax, params.ThreatResolution);
 
 command = sprintf('"%s" %s', exe, argText);
 [status, output] = system(command);

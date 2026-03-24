@@ -1,12 +1,16 @@
 function resolution = getThreatResolution(threats)
 
-resolution = NaN;
 if isempty(threats)
-    return
+    error("getThreatResolution:NoThreats", "Threat list must contain at least one threat.");
 end
 
-if isfield(threats, "Resolution")
-    resolution = threats(1).Resolution;
+if ~isfield(threats, "Resolution")
+    error("getThreatResolution:MissingResolution", "Threat data is missing the Resolution field.");
+end
+
+resolution = double(threats(1).Resolution);
+if ~isfinite(resolution) || resolution <= 0
+    error("getThreatResolution:InvalidResolution", "Threat resolution must be a positive finite number.");
 end
 
 end

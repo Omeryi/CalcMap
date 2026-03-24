@@ -9,6 +9,7 @@ prompt = { ...
     "Region Count"
     "Radius Min"
     "Radius Max"
+    "Threat Resolution"
     };
 defaults = { ...
     num2str(params.XMin)
@@ -18,6 +19,7 @@ defaults = { ...
     num2str(params.RegionCount)
     num2str(params.RadiusMin)
     num2str(params.RadiusMax)
+    num2str(params.ThreatResolution)
     };
 
 answer = inputdlg(prompt, "Generate Map Parameters", [1 50], defaults);
@@ -40,6 +42,7 @@ params.YMax = values(4);
 params.RegionCount = round(values(5));
 params.RadiusMin = values(6);
 params.RadiusMax = values(7);
+params.ThreatResolution = values(8);
 
 if params.XMax <= params.XMin || params.YMax <= params.YMin
     errordlg("Max bounds must be greater than min bounds.", "Invalid bounds", "modal");
@@ -55,6 +58,12 @@ end
 
 if params.RadiusMin <= 0 || params.RadiusMax < params.RadiusMin
     errordlg("Radii must be positive and Radius Max must be >= Radius Min.", "Invalid radii", "modal");
+    ok = false;
+    return
+end
+
+if params.ThreatResolution <= 0
+    errordlg("Threat Resolution must be positive.", "Invalid threat resolution", "modal");
     ok = false;
     return
 end

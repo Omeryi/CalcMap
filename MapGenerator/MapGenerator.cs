@@ -19,6 +19,16 @@ namespace MapGenerator
 
         public Map Generate(MapParameters parameters)
         {
+            if (parameters == null)
+            {
+                throw new ArgumentNullException(nameof(parameters));
+            }
+
+            if (parameters.ThreatResolution <= 0)
+            {
+                throw new ArgumentException("Threat resolution must be positive.", nameof(parameters));
+            }
+
             Map map = new Map
             {
                 MapId = Guid.NewGuid(),
@@ -60,16 +70,18 @@ namespace MapGenerator
                 CenterX = x,
                 CenterY = y,
                 Radius = r,
-                Image = GenerateImage(r)
+                Resolution = parameters.ThreatResolution,
+                Image = GenerateImage(r, parameters.ThreatResolution)
             };
         }
 
-        private float[][] GenerateImage(double radius)
+        private float[][] GenerateImage(double radius, double resolution)
         {
             // Compute the size of the image grid.
-            // Each pixel represents Threat.resolution units in the map.
+            // Each pixel represents resolution units in the map.
             // The image covers a square that contains the whole circular threat.
-            int size = (int)Math.Ceiling((2 * radius) / Threat.resolution);
+            int size = (int)Math.Ceiling((2 * radius) / resolution);
+            size = Math.Max(size, 1);
 
             // Create the jagged array that will hold the threat intensity values.
             float[][] image = new float[size][];
@@ -91,8 +103,8 @@ namespace MapGenerator
                 {
                     // Convert pixel coordinates to map coordinates relative to the center.
                     // Multiplying by resolution converts pixel distance into map units.
-                    double x = (i - center) * Threat.resolution;
-                    double y = (j - center) * Threat.resolution;
+                    double x = (i - center) * resolution;
+                    double y = (j - center) * resolution;
 
                     double dist = Math.Sqrt(x * x + y * y);
 

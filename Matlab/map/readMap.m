@@ -43,17 +43,56 @@ if isempty(threats)
         'Map JSON in "%s" has no threats.', file);
 end
 
-if isfield(threats(1),'Resolution')
-    res = threats(1).Resolution;
-elseif isfield(params,'Resolution')
-    res = params.Resolution;
-else
+for t = 1:numel(threats)
+    validateThreatSchema(threats(t), t, file);
+end
+
+if ~isfield(threats(1),'Resolution')
     error('readMap:MissingResolution', ...
-        'Map JSON in "%s" is missing "Resolution" in threats or parameters.', file);
+        'Map JSON in "%s" is missing "Resolution" in threats.', file);
+end
+
+res = threats(1).Resolution;
+if ~isfinite(res) || res <= 0
+    error('readMap:InvalidResolution', ...
+        'Map JSON in "%s" has a non-positive or non-finite threat resolution.', file);
 end
 
 if nargin < 2 || isempty(maxRows) || maxRows < 1
     maxRows = inf;
+end
+
+function validateThreatSchema(threat, threatIndex, file)
+
+requiredFields = {'Id', 'CenterX', 'CenterY', 'Radius', 'Resolution', 'Image'};
+for i = 1:numel(requiredFields)
+    if ~isfield(threat, requiredFields{i})
+        error('readMap:MissingThreatField', ...
+            'Threat %d in "%s" is missing required field "%s".', ...
+            threatIndex, file, requiredFields{i});
+    end
+end
+
+if ~isfinite(threat.CenterX) || ~isfinite(threat.CenterY)
+    error('readMap:InvalidThreatCenter', ...
+        'Threat %d in "%s" has a non-finite center.', threatIndex, file);
+end
+
+if ~isfinite(threat.Radius) || threat.Radius <= 0
+    error('readMap:InvalidThreatRadius', ...
+        'Threat %d in "%s" must have a positive finite radius.', threatIndex, file);
+end
+
+if ~isfinite(threat.Resolution) || threat.Resolution <= 0
+    error('readMap:InvalidThreatResolution', ...
+        'Threat %d in "%s" must have a positive finite resolution.', threatIndex, file);
+end
+
+if isempty(threat.Image)
+    error('readMap:MissingThreatImage', ...
+        'Threat %d in "%s" must contain non-empty image data.', threatIndex, file);
+end
+
 end
 if nargin < 3 || isempty(maxCols) || maxCols < 1
     maxCols = inf;

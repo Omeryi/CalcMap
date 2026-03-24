@@ -24,6 +24,8 @@ namespace MapGenerator
         public double RadiusMin { get; set; }
 
         public double RadiusMax { get; set; }
+
+        public double ThreatResolution { get; set; }
     }
 
     public class Map
@@ -38,11 +40,11 @@ namespace MapGenerator
     {
         static void Main(string[] args)
         {
-            if (args.Length != 0 && args.Length != 7)
+            if (args.Length != 8)
             {
                 Console.WriteLine(
                     "Usage:\n" +
-                    "MapGenerator.exe xmin xmax ymin ymax regionCount rMin rMax"
+                    "MapGenerator.exe xmin xmax ymin ymax regionCount rMin rMax threatResolution"
                 );
                 return;
             }
@@ -51,21 +53,14 @@ namespace MapGenerator
             string solutionDir = Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", ".."));
             string mapsRoot = Path.Combine(solutionDir, "Maps");
 
-            double xmin = -100, xmax = 100;
-            double ymin = -100, ymax = 100;
-            int regionCount = 10;
-            double rMin = 10, rMax = 30;
-
-            if (args.Length == 7)
-            {
-                xmin = double.Parse(args[0]);
-                xmax = double.Parse(args[1]);
-                ymin = double.Parse(args[2]);
-                ymax = double.Parse(args[3]);
-                regionCount = int.Parse(args[4]);
-                rMin = double.Parse(args[5]);
-                rMax = double.Parse(args[6]);
-            }
+            double xmin = double.Parse(args[0]);
+            double xmax = double.Parse(args[1]);
+            double ymin = double.Parse(args[2]);
+            double ymax = double.Parse(args[3]);
+            int regionCount = int.Parse(args[4]);
+            double rMin = double.Parse(args[5]);
+            double rMax = double.Parse(args[6]);
+            double threatResolution = double.Parse(args[7]);
 
             MapParameters parameters = new MapParameters
             {
@@ -75,7 +70,8 @@ namespace MapGenerator
                 YMax = ymax,
                 RegionCount = regionCount,
                 RadiusMin = rMin,
-                RadiusMax = rMax
+                RadiusMax = rMax,
+                ThreatResolution = threatResolution
             };
 
             MapGenerator generator = new MapGenerator(); 
