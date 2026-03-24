@@ -6,7 +6,7 @@ prompt = { ...
     "X Max"
     "Y Min"
     "Y Max"
-    "Region Count"
+    "Threat Count"
     "Radius Min"
     "Radius Max"
     "Threat Resolution"

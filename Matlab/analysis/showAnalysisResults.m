@@ -1,4 +1,4 @@
-function showAnalysisResults(analysisOutput, resultFile, mapState, pathPoints, pathFile)
+function showAnalysisResults(analysisOutput, resultFile, mapState, pathPoints, pathFile, mapAxes)
 
 [tableData, totalMs] = buildAnalysisTableData(analysisOutput, mapState);
 if isempty(tableData)
@@ -9,6 +9,7 @@ end
 [~, pathName, pathExt] = fileparts(char(pathFile));
 avgMs = totalMs / size(tableData, 1);
 pathLength = getPathLength(pathPoints);
+pathPointCount = size(pathPoints, 1);
 pathResolution = getPathResolution(pathPoints);
 threatResolution = getThreatResolution(mapState.Threats);
 mapGuid = getMapGuid(mapState);
@@ -36,8 +37,8 @@ summaryLabel1.Text = sprintf("Map: %s | Path: %s%s | Total: %.3f ms | Avg/threat
 summaryLabel2 = uilabel(resultsFigure);
 summaryLabel2.Position = [20 figureHeight - 82 figureWidth - 40 28];
 summaryLabel2.WordWrap = "on";
-summaryLabel2.Text = sprintf("Path length: %.3f | Path resolution: %.3f | Threat resolution: %.3f", ...
-    pathLength, pathResolution, threatResolution);
+summaryLabel2.Text = sprintf("Path length: %.3f | Path points: %d | Path resolution: %.3f | Threat resolution: %.3f", ...
+    pathLength, pathPointCount, pathResolution, threatResolution);
 
 resultsTable = uitable(resultsFigure);
 resultsTable.Position = [20 56 tableWidth tableHeight];
@@ -50,6 +51,40 @@ closeButton = uibutton(resultsFigure, "push");
 closeButton.Position = [figureWidth - 100 14 80 28];
 closeButton.Text = "Close";
 closeButton.ButtonPushedFcn = @(~, ~) delete(resultsFigure);
+
+saveScreenshotsButton = uibutton(resultsFigure, "push");
+saveScreenshotsButton.Position = [figureWidth - 250 14 130 28];
+saveScreenshotsButton.Text = "Save Screenshots";
+saveScreenshotsButton.ButtonPushedFcn = @(~, ~) saveScreenshots();
+
+    function saveScreenshots()
+        if ~isgraphics(resultsFigure)
+            error("showAnalysisResults:InvalidResultsFigure", "Results window is no longer valid.");
+        end
+
+        if ~isgraphics(mapAxes)
+            error("showAnalysisResults:InvalidMapAxes", "Map axes are no longer valid.");
+        end
+
+        currentMapGuid = char(getMapGuid(mapState));
+        mapFolder = char(string(mapState.Folder));
+        mapsRoot = fileparts(mapFolder);
+        repoRoot = fileparts(mapsRoot);
+        targetFolder = fullfile(repoRoot, "Results", currentMapGuid, char(string(resultName)));
+        if ~isfolder(targetFolder)
+            mkdir(targetFolder);
+        end
+
+        mapImageFile = fullfile(targetFolder, "map.png");
+        resultsImageFile = fullfile(targetFolder, "results.png");
+
+        drawnow;
+        exportgraphics(mapAxes, mapImageFile, "Resolution", 200);
+        drawnow;
+        exportapp(resultsFigure, resultsImageFile);
+
+        uialert(resultsFigure, sprintf("Saved screenshots to:\n%s", targetFolder), "Screenshots saved");
+    end
 
 end
 

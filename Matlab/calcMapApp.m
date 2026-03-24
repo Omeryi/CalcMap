@@ -241,7 +241,7 @@ classdef calcMapApp < matlab.apps.AppBase
             try
                 app.updateStatus("Running analysis...");
                 result = runAnalysis(getRepoRoot(), app.Map, app.Path, app.CurrentPathFile);
-                showAnalysisResults(result.Output, result.ResultFile, app.Map, app.Path, result.PathFile);
+                showAnalysisResults(result.Output, result.ResultFile, app.Map, app.Path, result.PathFile, app.UIAxes);
                 [~, name, ext] = fileparts(char(result.ResultFile));
                 app.updateStatus("Saved " + name + ext + " and displayed results");
             catch ME
@@ -262,6 +262,8 @@ classdef calcMapApp < matlab.apps.AppBase
             ylabel(app.UIAxes, "Y");
             colormap(app.UIAxes, "hot");
             app.UIAxes.Position = [250 30 920 700];
+            axesToolbar = axtoolbar(app.UIAxes, {"zoomin", "zoomout", "pan", "restoreview"});
+            axesToolbar.Visible = "on";
 
             app.LoadMapButton = uibutton(app.UIFigure, "push");
             app.LoadMapButton.Position = [30 640 180 40];
