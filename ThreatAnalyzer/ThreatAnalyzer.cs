@@ -17,6 +17,7 @@ namespace ns_ThreatAnalyzer
     {
         public Guid Id { get; set; }
         public double Grade { get; set; }
+        public int PointsAboveThresholdCount { get; set; }
     }
 
     public class Point
@@ -27,6 +28,8 @@ namespace ns_ThreatAnalyzer
 
     public class ThreatAnalyzer
     {
+        private const float PointCountThreshold = 0.2f;
+
         // Caches values derived from a Threat once so the hot point loop can reuse them cheaply.
         private sealed class ThreatMeta
         {
@@ -71,11 +74,15 @@ namespace ns_ThreatAnalyzer
 
         public ThreatAnalyzer() { }
 
+        public int ProcessedPathPointCount { get; private set; }
+
         public List<ThreatResult> Analyze(List<Threat> threats, List<Point> path)
         {
+            ProcessedPathPointCount = 0;
             ThreatMeta[] metas = BuildThreatMetas(threats);
             ValidatePath(path);
             double[] grades = new double[metas.Length];
+            int[] pointsAboveThresholdCounts = new int[metas.Length];
 
             bool hasPreviousPoint = false;
             double previousPointX = 0.0;
@@ -94,25 +101,35 @@ namespace ns_ThreatAnalyzer
                 previousPointX = pointX;
                 previousPointY = pointY;
                 hasPreviousPoint = true;
+                ProcessedPathPointCount++;
 
                 for (int threatIndex = 0; threatIndex < metas.Length; threatIndex++)
                 {
                     if (TryGetThreatValueAtPoint(metas[threatIndex], pointX, pointY, out float threatValue))
                     {
                         grades[threatIndex] += threatValue;
+                        if (threatValue > PointCountThreshold)
+                        {
+                            pointsAboveThresholdCounts[threatIndex]++;
+                        }
                     }
                 }
             }
 
-            return BuildResults(metas, grades);
+            return BuildResults(metas, grades, pointsAboveThresholdCounts);
         }
 
-        private static List<ThreatResult> BuildResults(ThreatMeta[] metas, double[] grades)
+        private static List<ThreatResult> BuildResults(ThreatMeta[] metas, double[] grades, int[] pointsAboveThresholdCounts)
         {
             List<ThreatResult> results = new List<ThreatResult>(metas.Length);
             for (int i = 0; i < metas.Length; i++)
             {
-                results.Add(new ThreatResult { Id = metas[i].Id, Grade = grades[i] });
+                results.Add(new ThreatResult
+                {
+                    Id = metas[i].Id,
+                    Grade = grades[i],
+                    PointsAboveThresholdCount = pointsAboveThresholdCounts[i]
+                });
             }
 
             return results;

@@ -13,12 +13,14 @@ namespace RunAnalyzer
     {
         public Guid Id { get; set; }
         public double Grade { get; set; }
+        public int PointsAboveThresholdCount { get; set; }
         public double ElapsedMilliseconds { get; set; }
     }
 
     internal class AnalysisOutput
     {
         public double TotalElapsedMilliseconds { get; set; }
+        public int ProcessedPathPointCount { get; set; }
         public List<AnalysisResultRow> Results { get; set; }
     }
 
@@ -52,6 +54,7 @@ namespace RunAnalyzer
             AnalysisOutput output = new AnalysisOutput
             {
                 TotalElapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds,
+                ProcessedPathPointCount = threatAnalyzer.ProcessedPathPointCount,
                 Results = outputRows
             };
 
@@ -129,6 +132,7 @@ namespace RunAnalyzer
                 {
                     Id = results[i].Id,
                     Grade = results[i].Grade,
+                    PointsAboveThresholdCount = results[i].PointsAboveThresholdCount,
                     // Backward-compatible field for existing GUI table; this is average time, not per-threat measured time.
                     ElapsedMilliseconds = averagePerThreat
                 });

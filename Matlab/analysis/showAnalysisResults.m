@@ -1,6 +1,6 @@
 function showAnalysisResults(analysisOutput, resultFile, mapState, pathPoints, pathFile, mapAxes)
 
-[tableData, totalMs] = buildAnalysisTableData(analysisOutput, mapState);
+[tableData, totalMs, positiveThreatCount, totalThreatCount, processedPathPointCount] = buildAnalysisTableData(analysisOutput, mapState);
 if isempty(tableData)
     error("showAnalysisResults:EmptyResults", "No analysis results were returned.");
 end
@@ -8,19 +8,20 @@ end
 [~, resultName, resultExt] = fileparts(char(resultFile));
 [~, pathName, pathExt] = fileparts(char(pathFile));
 avgMs = totalMs / size(tableData, 1);
+avgMsPerPathPoint = totalMs / processedPathPointCount;
 pathLength = getPathLength(pathPoints);
 pathPointCount = size(pathPoints, 1);
 pathResolution = getPathResolution(pathPoints);
 threatResolution = getThreatResolution(mapState.Threats);
 mapGuid = getMapGuid(mapState);
 
-columnWidths = [90 300 130 130 120];
+columnWidths = [90 300 110 110 110 120];
 tableWidth = sum(columnWidths);
 tableHeight = min(14, size(tableData, 1)) * 22 + 28;
 figureWidth = max(tableWidth + 40, 980);
-figureHeight = max(tableHeight + 150, 500);
+figureHeight = max(tableHeight + 180, 530);
 tableWidth = figureWidth - 40;
-tableHeight = figureHeight - 150;
+tableHeight = figureHeight - 186;
 
 resultsFigure = uifigure( ...
     "Name", sprintf("Analysis Results - %s%s", resultName, resultExt), ...
@@ -28,23 +29,29 @@ resultsFigure = uifigure( ...
     "WindowStyle", "modal");
 
 summaryLabel1 = uilabel(resultsFigure);
-summaryLabel1.Position = [20 figureHeight - 46 figureWidth - 40 32];
+summaryLabel1.Position = [20 figureHeight - 46 figureWidth - 40 24];
 summaryLabel1.FontWeight = "bold";
 summaryLabel1.WordWrap = "on";
-summaryLabel1.Text = sprintf("Map: %s | Path: %s%s | Total: %.3f ms | Avg/threat: %.3f ms", ...
-    char(mapGuid), pathName, pathExt, totalMs, avgMs);
+summaryLabel1.Text = sprintf("Map: %s | Path: %s%s", ...
+    char(mapGuid), pathName, pathExt);
 
 summaryLabel2 = uilabel(resultsFigure);
-summaryLabel2.Position = [20 figureHeight - 82 figureWidth - 40 28];
+summaryLabel2.Position = [20 figureHeight - 74 figureWidth - 40 24];
 summaryLabel2.WordWrap = "on";
-summaryLabel2.Text = sprintf("Path length: %.3f | Path points: %d | Path resolution: %.3f | Threat resolution: %.3f", ...
+summaryLabel2.Text = sprintf("Total: %.3f ms | Avg/threat: %.3f ms | Avg/path point: %.6f ms | Positive threats: %d/%d", ...
+    totalMs, avgMs, avgMsPerPathPoint, positiveThreatCount, totalThreatCount);
+
+summaryLabel3 = uilabel(resultsFigure);
+summaryLabel3.Position = [20 figureHeight - 102 figureWidth - 40 24];
+summaryLabel3.WordWrap = "on";
+summaryLabel3.Text = sprintf("Path length: %.3f | Path points: %d | Path resolution: %.3f | Threat resolution: %.3f", ...
     pathLength, pathPointCount, pathResolution, threatResolution);
 
 resultsTable = uitable(resultsFigure);
 resultsTable.Position = [20 56 tableWidth tableHeight];
-resultsTable.ColumnName = {"Threat #", "Threat Id", "Center X", "Center Y", "Grade"};
+resultsTable.ColumnName = {"Threat #", "Threat Id", "Center X", "Center Y", "#Points > 0.2", "Grade"};
 resultsTable.ColumnWidth = num2cell(columnWidths);
-resultsTable.ColumnFormat = {'char', 'char', 'numeric', 'numeric', 'numeric'};
+resultsTable.ColumnFormat = {'char', 'char', 'numeric', 'numeric', 'numeric', 'numeric'};
 resultsTable.Data = tableData;
 
 closeButton = uibutton(resultsFigure, "push");
@@ -88,15 +95,19 @@ saveScreenshotsButton.ButtonPushedFcn = @(~, ~) saveScreenshots();
 
 end
 
-function [tableData, totalMs] = buildAnalysisTableData(analysisOutput, mapState)
+function [tableData, totalMs, positiveThreatCount, totalThreatCount, processedPathPointCount] = buildAnalysisTableData(analysisOutput, mapState)
 
 totalMs = 0;
-tableData = cell(0, 5);
+positiveThreatCount = 0;
+totalThreatCount = 0;
+processedPathPointCount = 0;
+tableData = cell(0, 6);
 if isempty(analysisOutput) || ~isfield(analysisOutput, "Results") || isempty(analysisOutput.Results)
     return
 end
 
 totalMs = analysisOutput.TotalElapsedMilliseconds;
+processedPathPointCount = double(analysisOutput.ProcessedPathPointCount);
 results = analysisOutput.Results;
 if ~isstruct(results)
     return
@@ -107,8 +118,10 @@ if isscalar(results)
 end
 
 rowCount = numel(results);
-tableData = cell(rowCount, 5);
+tableData = cell(rowCount, 6);
 gradeValues = NaN(rowCount, 1);
+positiveThreatCount = 0;
+totalThreatCount = rowCount;
 
 for i = 1:rowCount
     [centerX, centerY, threatNumber] = getThreatCenter(mapState.Threats, results(i).Id);
@@ -121,8 +134,12 @@ for i = 1:rowCount
     tableData{i, 2} = char(string(results(i).Id));
     tableData{i, 3} = double(centerX);
     tableData{i, 4} = double(centerY);
+    tableData{i, 5} = double(results(i).PointsAboveThresholdCount);
     gradeValues(i) = double(results(i).Grade);
-    tableData{i, 5} = gradeValues(i);
+    tableData{i, 6} = gradeValues(i);
+    if gradeValues(i) > 0
+        positiveThreatCount = positiveThreatCount + 1;
+    end
 end
 
 [~, sortOrder] = sort(gradeValues, "descend");
