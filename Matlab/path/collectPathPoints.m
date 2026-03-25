@@ -35,7 +35,6 @@ ax.XLimMode = "manual";
 ax.YLimMode = "manual";
 xlim(ax, xLimits);
 ylim(ax, yLimits);
-cleanupObj = onCleanup(@restoreInteractionState); %#ok<NASGU>
 
 fig.Pointer = "crosshair";
 fig.WindowButtonDownFcn = @handleMouseClick;
@@ -46,6 +45,7 @@ try
 catch
     cancelled = true;
 end
+restoreInteractionState();
 
 if cancelled
     points = [];
@@ -53,8 +53,12 @@ end
 
     function handleMouseClick(~, ~)
         clickedObject = hittest(fig);
-        if isempty(clickedObject) || ...
-                (~isequal(clickedObject, ax) && ~isa(clickedObject, "matlab.graphics.primitive.Image"))
+        if isempty(clickedObject)
+            return
+        end
+
+        clickedAxes = ancestor(clickedObject, "axes");
+        if ~isequal(clickedObject, ax) && ~isequal(clickedAxes, ax)
             return
         end
 
@@ -65,7 +69,7 @@ end
             return
         end
 
-        points(end + 1, :) = point; %#ok<AGROW>
+        points(end + 1, :) = point;
         renderCache = updatePathOverlay(ax, renderCache, mapState, points);
     end
 
