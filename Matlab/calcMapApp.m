@@ -130,8 +130,28 @@ classdef calcMapApp < matlab.apps.AppBase
             end
 
             try
-                app.updateStatus("Drawing path...");
-                points = collectPathPoints(app.UIFigure, app.UIAxes, app.Map.Name, app.Map, app.Path, app.buildRenderOptions());
+                threatResolution = getThreatResolution(app.Map.Threats);
+                currentResolution = getPathResolution(app.Path);
+                defaultSpacing = 2 * threatResolution;
+                if ~isfinite(defaultSpacing) || defaultSpacing <= 0
+                    defaultSpacing = currentResolution;
+                end
+
+                [ok, spacing] = promptPathResolution(defaultSpacing, currentResolution, threatResolution);
+                if ~ok
+                    app.updateStatus("Draw path cancelled");
+                    return
+                end
+
+                app.updateStatus(sprintf("Drawing path (target spacing %.3f)...", spacing));
+                rawPoints = collectPathPoints(app.UIFigure, app.UIAxes, app.Map.Name, app.Map, app.Path, app.buildRenderOptions(), spacing);
+                if isempty(rawPoints)
+                    app.renderScene();
+                    app.updateStatus("Draw path cancelled");
+                    return
+                end
+
+                points = resamplePathBySpacing(rawPoints, spacing);
                 if isempty(points)
                     app.renderScene();
                     app.updateStatus("Draw path cancelled");
@@ -141,7 +161,7 @@ classdef calcMapApp < matlab.apps.AppBase
                 app.Path = points;
                 app.CurrentPathFile = "";
                 app.renderScene();
-                app.updateStatus("Path updated");
+                app.updateStatus(sprintf("Path updated (spacing %.3f, %d points)", spacing, size(points, 1)));
             catch ME
                 uialert(app.UIFigure, string(ME.message), "Draw path failed");
                 app.renderScene();
@@ -161,25 +181,11 @@ classdef calcMapApp < matlab.apps.AppBase
             end
 
             try
-                currentResolution = getPathResolution(app.Path);
-                threatResolution = getThreatResolution(app.Map.Threats);
-                % Default to a path spacing that is twice the threat grid resolution.
-                defaultSpacing = 2 * threatResolution;
-                if ~isfinite(defaultSpacing) || defaultSpacing <= 0
-                    defaultSpacing = currentResolution;
-                end
-
-                [ok, spacing] = promptPathResolution(defaultSpacing, currentResolution, threatResolution);
-                if ~ok
-                    app.updateStatus("Save path cancelled");
-                    return
-                end
-
-                [savedFile, savedPath] = savePath(app.Map.Folder, app.Path, spacing);
+                [savedFile, savedPath] = savePath(app.Map.Folder, app.Path);
                 app.Path = savedPath;
                 app.CurrentPathFile = string(savedFile);
                 app.renderScene();
-                app.updateStatus(sprintf("Saved path (spacing %.3f): %s", spacing, char(app.CurrentPathFile)));
+                app.updateStatus(sprintf("Saved path (%d points): %s", size(savedPath, 1), char(app.CurrentPathFile)));
             catch ME
                 uialert(app.UIFigure, string(ME.message), "Save path failed");
                 app.updateStatus("Save path failed");

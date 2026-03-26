@@ -1,10 +1,14 @@
-function points = collectPathPoints(fig, ax, mapName, mapState, existingPath, renderOptions)
+function points = collectPathPoints(fig, ax, mapName, mapState, existingPath, renderOptions, targetSpacing)
 
 if nargin < 5
     existingPath = [];
 end
 if nargin < 6
     renderOptions = struct();
+end
+if nargin < 7 || ~isfinite(targetSpacing) || targetSpacing <= 0
+    error("collectPathPoints:InvalidTargetSpacing", ...
+        "Target path spacing must be a positive finite number.");
 end
 
 mapLabel = string(mapName);
@@ -17,7 +21,6 @@ end
 
 renderCache = renderCachedMap(ax, mapState, struct(), renderOptions);
 renderCache = updatePathOverlay(ax, renderCache, mapState, existingPath);
-title(ax, "Map: " + mapLabel + " | Click points, ENTER to finish, ESC to cancel");
 
 originalButtonDownFcn = fig.WindowButtonDownFcn;
 originalKeyPressFcn = fig.WindowKeyPressFcn;
@@ -35,6 +38,7 @@ ax.XLimMode = "manual";
 ax.YLimMode = "manual";
 xlim(ax, xLimits);
 ylim(ax, yLimits);
+updateDrawTitle();
 
 fig.Pointer = "crosshair";
 fig.WindowButtonDownFcn = @handleMouseClick;
@@ -71,6 +75,7 @@ end
 
         points(end + 1, :) = point;
         renderCache = updatePathOverlay(ax, renderCache, mapState, points);
+        updateDrawTitle();
     end
 
     function handleKeyPress(~, event)
@@ -100,6 +105,24 @@ end
             ax.NextPlot = originalNextPlot;
             title(ax, "Map: " + mapLabel);
         end
+    end
+
+    function updateDrawTitle()
+        clickedPointCount = size(points, 1);
+        approximateSavedPointCount = getApproximateSavedPointCount(points, targetSpacing);
+        title(ax, sprintf([ ...
+            'Map: %s | Click points, ENTER to finish, ESC to cancel | ' ...
+            'Target spacing %.3f | Clicked %d | Approx saved points %d'], ...
+            char(mapLabel), targetSpacing, clickedPointCount, approximateSavedPointCount));
+    end
+
+    function approximateSavedPointCount = getApproximateSavedPointCount(pathPoints, spacing)
+        if isempty(pathPoints)
+            approximateSavedPointCount = 0;
+            return
+        end
+
+        approximateSavedPointCount = size(resamplePathBySpacing(pathPoints, spacing), 1);
     end
 
 end
