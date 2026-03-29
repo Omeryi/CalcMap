@@ -19,6 +19,7 @@ namespace RunAnalyzer
 
     internal class AnalysisOutput
     {
+        public string AnalysisMode { get; set; }
         public double TotalElapsedMilliseconds { get; set; }
         public int ProcessedPathPointCount { get; set; }
         public List<AnalysisResultRow> Results { get; set; }
@@ -28,16 +29,19 @@ namespace RunAnalyzer
     {
         static void Main(string[] args)
         {
-            if (args.Length != 2)
+            if (args.Length != 2 && args.Length != 3)
             {
                 Console.WriteLine("Usage:");
-                Console.WriteLine("RunAnalyzer.exe <map.json> <path.json>");
+                Console.WriteLine("RunAnalyzer.exe <map.json> <path.json> [optimized|unoptimized]");
                 Environment.ExitCode = 1;
                 return;
             }
 
             string mapPath = Path.GetFullPath(args[0]);
             string pathPath = Path.GetFullPath(args[1]);
+            ns_ThreatAnalyzer.ThreatAnalysisMode analysisMode = args.Length >= 3
+                ? ParseAnalysisMode(args[2])
+                : ns_ThreatAnalyzer.ThreatAnalysisMode.Unoptimized;
 
             ValidateInputFile(mapPath, "map");
             ValidateInputFile(pathPath, "path");
@@ -45,7 +49,10 @@ namespace RunAnalyzer
             Map map = LoadMap(mapPath);
             List<Point> path = LoadPath(pathPath);
 
-            ThreatAnalyzer threatAnalyzer = new ThreatAnalyzer();
+            ThreatAnalyzer threatAnalyzer = new ThreatAnalyzer
+            {
+                Mode = analysisMode
+            };
             Stopwatch stopwatch = Stopwatch.StartNew();
             List<ThreatResult> results = threatAnalyzer.Analyze(map.Threats, path);
             stopwatch.Stop();
@@ -53,6 +60,7 @@ namespace RunAnalyzer
             List<AnalysisResultRow> outputRows = BuildOutputRows(results, stopwatch.Elapsed.TotalMilliseconds);
             AnalysisOutput output = new AnalysisOutput
             {
+                AnalysisMode = GetAnalysisModeDisplayName(analysisMode),
                 TotalElapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds,
                 ProcessedPathPointCount = threatAnalyzer.ProcessedPathPointCount,
                 Results = outputRows
@@ -65,6 +73,34 @@ namespace RunAnalyzer
             Console.WriteLine("Results saved to " + outputPath);
             Console.WriteLine("Total elapsed ms: " + output.TotalElapsedMilliseconds.ToString("F3"));
             Console.WriteLine("RESULT_FILE=" + outputPath);
+        }
+
+        private static ns_ThreatAnalyzer.ThreatAnalysisMode ParseAnalysisMode(string modeText)
+        {
+            if (string.Equals(modeText, "optimized", StringComparison.OrdinalIgnoreCase))
+            {
+                return ns_ThreatAnalyzer.ThreatAnalysisMode.PathChunkBoundingBoxes;
+            }
+
+            if (string.Equals(modeText, "unoptimized", StringComparison.OrdinalIgnoreCase))
+            {
+                return ns_ThreatAnalyzer.ThreatAnalysisMode.Unoptimized;
+            }
+
+            throw new ArgumentException("Unsupported analysis mode: " + modeText);
+        }
+
+        private static string GetAnalysisModeDisplayName(ns_ThreatAnalyzer.ThreatAnalysisMode mode)
+        {
+            switch (mode)
+            {
+                case ns_ThreatAnalyzer.ThreatAnalysisMode.Unoptimized:
+                    return "Unoptimized";
+                case ns_ThreatAnalyzer.ThreatAnalysisMode.PathChunkBoundingBoxes:
+                    return "Optimized";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported analysis mode.");
+            }
         }
 
         private static void ValidateInputFile(string filePath, string label)

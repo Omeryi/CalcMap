@@ -14,6 +14,7 @@ pathPointCount = size(pathPoints, 1);
 pathResolution = getPathResolution(pathPoints);
 threatResolution = getThreatResolution(mapState.Threats);
 mapGuid = getMapGuid(mapState);
+analysisMode = getAnalysisModeText(analysisOutput);
 
 columnWidths = [90 300 110 110 110 120];
 tableWidth = sum(columnWidths);
@@ -32,8 +33,8 @@ summaryLabel1 = uilabel(resultsFigure);
 summaryLabel1.Position = [20 figureHeight - 46 figureWidth - 40 24];
 summaryLabel1.FontWeight = "bold";
 summaryLabel1.WordWrap = "on";
-summaryLabel1.Text = sprintf("Map: %s | Path: %s%s", ...
-    char(mapGuid), pathName, pathExt);
+summaryLabel1.Text = sprintf("Map: %s | Path: %s%s | Mode: %s", ...
+    char(mapGuid), pathName, pathExt, analysisMode);
 
 summaryLabel2 = uilabel(resultsFigure);
 summaryLabel2.Position = [20 figureHeight - 74 figureWidth - 40 24];
@@ -144,6 +145,17 @@ end
 
 [~, sortOrder] = sort(gradeValues, "descend");
 tableData = tableData(sortOrder, :);
+
+end
+
+function analysisMode = getAnalysisModeText(analysisOutput)
+
+analysisMode = "n/a";
+if isempty(analysisOutput) || ~isfield(analysisOutput, "AnalysisMode")
+    return
+end
+
+analysisMode = string(analysisOutput.AnalysisMode);
 
 end
 

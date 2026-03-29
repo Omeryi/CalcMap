@@ -10,6 +10,8 @@ classdef calcMapApp < matlab.apps.AppBase
         LoadPathButton matlab.ui.control.Button
         AnalyzeButton matlab.ui.control.Button
         ResetButton matlab.ui.control.Button
+        AnalysisModeLabel matlab.ui.control.Label
+        AnalysisModeDropDown matlab.ui.control.DropDown
         ThreatLabelsCheckBox matlab.ui.control.CheckBox
         StatusLabel matlab.ui.control.Label
     end
@@ -50,6 +52,7 @@ classdef calcMapApp < matlab.apps.AppBase
             renderCache = struct( ...
                 "MapKey", "", ...
                 "ImageHandle", [], ...
+                "ColorbarHandle", [], ...
                 "OutlineHandle", [], ...
                 "LabelHandles", [], ...
                 "PathHaloHandle", [], ...
@@ -130,38 +133,18 @@ classdef calcMapApp < matlab.apps.AppBase
             end
 
             try
-                threatResolution = getThreatResolution(app.Map.Threats);
-                currentResolution = getPathResolution(app.Path);
-                defaultSpacing = 2 * threatResolution;
-                if ~isfinite(defaultSpacing) || defaultSpacing <= 0
-                    defaultSpacing = currentResolution;
-                end
-
-                [ok, spacing] = promptPathResolution(defaultSpacing, currentResolution, threatResolution);
-                if ~ok
-                    app.updateStatus("Draw path cancelled");
-                    return
-                end
-
-                app.updateStatus(sprintf("Drawing path (target spacing %.3f)...", spacing));
-                rawPoints = collectPathPoints(app.UIFigure, app.UIAxes, app.Map.Name, app.Map, app.Path, app.buildRenderOptions(), spacing);
+                app.updateStatus("Drawing path...");
+                rawPoints = collectPathPoints(app.UIFigure, app.UIAxes, app.Map.Name, app.Map, app.Path, app.buildRenderOptions());
                 if isempty(rawPoints)
                     app.renderScene();
                     app.updateStatus("Draw path cancelled");
                     return
                 end
 
-                points = resamplePathBySpacing(rawPoints, spacing);
-                if isempty(points)
-                    app.renderScene();
-                    app.updateStatus("Draw path cancelled");
-                    return
-                end
-
-                app.Path = points;
+                app.Path = rawPoints;
                 app.CurrentPathFile = "";
                 app.renderScene();
-                app.updateStatus(sprintf("Path updated (spacing %.3f, %d points)", spacing, size(points, 1)));
+                app.updateStatus(sprintf("Path updated (%d points)", size(rawPoints, 1)));
             catch ME
                 uialert(app.UIFigure, string(ME.message), "Draw path failed");
                 app.renderScene();
@@ -246,7 +229,7 @@ classdef calcMapApp < matlab.apps.AppBase
 
             try
                 app.updateStatus("Running analysis...");
-                result = runAnalysis(getRepoRoot(), app.Map, app.Path, app.CurrentPathFile);
+                result = runAnalysis(getRepoRoot(), app.Map, app.Path, app.CurrentPathFile, app.AnalysisModeDropDown.Value);
                 showAnalysisResults(result.Output, result.ResultFile, app.Map, app.Path, result.PathFile, app.UIAxes);
                 [~, name, ext] = fileparts(char(result.ResultFile));
                 app.updateStatus("Saved " + name + ext + " and displayed results");
@@ -306,14 +289,23 @@ classdef calcMapApp < matlab.apps.AppBase
             app.ResetButton.Text = "Reset";
             app.ResetButton.ButtonPushedFcn = createCallbackFcn(app, @ResetButtonPushed, true);
 
+            app.AnalysisModeLabel = uilabel(app.UIFigure);
+            app.AnalysisModeLabel.Position = [30 270 180 22];
+            app.AnalysisModeLabel.Text = "Analysis Mode";
+
+            app.AnalysisModeDropDown = uidropdown(app.UIFigure);
+            app.AnalysisModeDropDown.Position = [30 245 180 22];
+            app.AnalysisModeDropDown.Items = {'Optimized', 'Unoptimized'};
+            app.AnalysisModeDropDown.Value = "Optimized";
+
             app.ThreatLabelsCheckBox = uicheckbox(app.UIFigure);
-            app.ThreatLabelsCheckBox.Position = [30 270 180 22];
+            app.ThreatLabelsCheckBox.Position = [30 210 180 22];
             app.ThreatLabelsCheckBox.Text = "Show Threat Labels";
             app.ThreatLabelsCheckBox.Value = false;
             app.ThreatLabelsCheckBox.ValueChangedFcn = createCallbackFcn(app, @ThreatLabelsCheckBoxValueChanged, true);
 
             app.StatusLabel = uilabel(app.UIFigure);
-            app.StatusLabel.Position = [30 30 180 220];
+            app.StatusLabel.Position = [30 30 180 165];
             app.StatusLabel.WordWrap = "on";
             app.StatusLabel.VerticalAlignment = "top";
             app.StatusLabel.Text = "Status: Ready";

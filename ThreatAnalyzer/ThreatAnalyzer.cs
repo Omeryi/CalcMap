@@ -3,6 +3,12 @@ using System.Collections.Generic;
 
 namespace ns_ThreatAnalyzer
 {
+    public enum ThreatAnalysisMode
+    {
+        Unoptimized = 0,
+        PathChunkBoundingBoxes = 1
+    }
+
     public class Threat
     {
         public Guid Id { get; set; }
@@ -28,7 +34,11 @@ namespace ns_ThreatAnalyzer
 
     public class ThreatAnalyzer
     {
-        private const float PointCountThreshold = 0.2f;
+        // Path points are grouped into coarse bounding boxes so optimized mode can skip
+        // large stretches of the path for threats that are obviously far away.
+        private const int DefaultTargetPathChunkCount = 10;
+        // Count how many processed path points meaningfully contribute to each threat.
+        private const float ThreatValueCountThreshold = 0.2f;
 
         // Caches values derived from a Threat once so the hot point loop can reuse them cheaply.
         private sealed class ThreatMeta
@@ -72,48 +82,46 @@ namespace ns_ThreatAnalyzer
             }
         }
 
+        private struct BoundingBox
+        {
+            public double MinX;
+            public double MaxX;
+            public double MinY;
+            public double MaxY;
+        }
+
+        private struct PathChunk
+        {
+            public int StartIndex;
+            public int EndIndex;
+            public BoundingBox Bounds;
+        }
+
         public ThreatAnalyzer() { }
 
+        public ThreatAnalysisMode Mode { get; set; } = ThreatAnalysisMode.Unoptimized;
+        public int TargetPathChunkCount { get; set; } = DefaultTargetPathChunkCount;
         public int ProcessedPathPointCount { get; private set; }
 
         public List<ThreatResult> Analyze(List<Threat> threats, List<Point> path)
         {
-            ProcessedPathPointCount = 0;
             ThreatMeta[] metas = BuildThreatMetas(threats);
-            ValidatePath(path);
+            // Normalize the path once up front so both modes operate on the same effective input.
+            Point[] processedPath = BuildProcessedPath(path);
+            ProcessedPathPointCount = processedPath.Length;
             double[] grades = new double[metas.Length];
             int[] pointsAboveThresholdCounts = new int[metas.Length];
 
-            bool hasPreviousPoint = false;
-            double previousPointX = 0.0;
-            double previousPointY = 0.0;
-
-            for (int pointIndex = 0; pointIndex < path.Count; pointIndex++)
+            switch (Mode)
             {
-                Point pathPoint = path[pointIndex];
-                double pointX = pathPoint.X;
-                double pointY = pathPoint.Y;
-                if (hasPreviousPoint && pointX == previousPointX && pointY == previousPointY)
-                {
-                    continue;
-                }
-
-                previousPointX = pointX;
-                previousPointY = pointY;
-                hasPreviousPoint = true;
-                ProcessedPathPointCount++;
-
-                for (int threatIndex = 0; threatIndex < metas.Length; threatIndex++)
-                {
-                    if (TryGetThreatValueAtPoint(metas[threatIndex], pointX, pointY, out float threatValue))
-                    {
-                        grades[threatIndex] += threatValue;
-                        if (threatValue > PointCountThreshold)
-                        {
-                            pointsAboveThresholdCounts[threatIndex]++;
-                        }
-                    }
-                }
+                case ThreatAnalysisMode.Unoptimized:
+                    AnalyzeUnoptimized(metas, processedPath, grades, pointsAboveThresholdCounts);
+                    break;
+                case ThreatAnalysisMode.PathChunkBoundingBoxes:
+                    AnalyzeWithPathChunkBoundingBoxes(metas, processedPath, grades, pointsAboveThresholdCounts, TargetPathChunkCount);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(Mode), Mode, "Unsupported threat analysis mode.");
             }
 
             return BuildResults(metas, grades, pointsAboveThresholdCounts);
@@ -135,6 +143,71 @@ namespace ns_ThreatAnalyzer
             return results;
         }
 
+        private static void AnalyzeUnoptimized(ThreatMeta[] metas, Point[] processedPath, double[] grades, int[] pointsAboveThresholdCounts)
+        {
+            for (int pointIndex = 0; pointIndex < processedPath.Length; pointIndex++)
+            {
+                Point pathPoint = processedPath[pointIndex];
+                AccumulateThreatGrades(metas, grades, pointsAboveThresholdCounts, pathPoint.X, pathPoint.Y);
+            }
+        }
+
+        private static void AnalyzeWithPathChunkBoundingBoxes(ThreatMeta[] metas, Point[] processedPath, double[] grades, int[] pointsAboveThresholdCounts, int targetPathChunkCount)
+        {
+            BoundingBox wholePathBounds = BuildPathChunkBounds(processedPath, 0, processedPath.Length - 1);
+            int pathPointsPerChunk = GetPathPointsPerChunk(processedPath.Length, targetPathChunkCount);
+            PathChunk[] pathChunks = BuildPathChunks(processedPath, pathPointsPerChunk);
+
+            for (int threatIndex = 0; threatIndex < metas.Length; threatIndex++)
+            {
+                ThreatMeta meta = metas[threatIndex];
+                BoundingBox threatBounds = GetThreatBounds(meta);
+                // Cheap whole-path reject before walking any chunk or point range for this threat.
+                if (!BoundsOverlap(threatBounds, wholePathBounds))
+                {
+                    continue;
+                }
+
+                for (int chunkIndex = 0; chunkIndex < pathChunks.Length; chunkIndex++)
+                {
+                    PathChunk pathChunk = pathChunks[chunkIndex];
+                    // Only exact-check points from path chunks whose bounding boxes overlap the threat.
+                    if (!BoundsOverlap(threatBounds, pathChunk.Bounds))
+                    {
+                        continue;
+                    }
+
+                    for (int pointIndex = pathChunk.StartIndex; pointIndex <= pathChunk.EndIndex; pointIndex++)
+                    {
+                        Point pathPoint = processedPath[pointIndex];
+                        if (TryGetThreatValueAtPoint(meta, pathPoint.X, pathPoint.Y, out float threatValue))
+                        {
+                            grades[threatIndex] += threatValue;
+                            if (threatValue > ThreatValueCountThreshold)
+                            {
+                                pointsAboveThresholdCounts[threatIndex]++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private static void AccumulateThreatGrades(ThreatMeta[] metas, double[] grades, int[] pointsAboveThresholdCounts, double pointX, double pointY)
+        {
+            for (int threatIndex = 0; threatIndex < metas.Length; threatIndex++)
+            {
+                if (TryGetThreatValueAtPoint(metas[threatIndex], pointX, pointY, out float threatValue))
+                {
+                    grades[threatIndex] += threatValue;
+                    if (threatValue > ThreatValueCountThreshold)
+                    {
+                        pointsAboveThresholdCounts[threatIndex]++;
+                    }
+                }
+            }
+        }
+
         private static ThreatMeta[] BuildThreatMetas(List<Threat> threats)
         {
             if (threats == null)
@@ -154,6 +227,33 @@ namespace ns_ThreatAnalyzer
             }
 
             return metas;
+        }
+
+        private static Point[] BuildProcessedPath(List<Point> path)
+        {
+            ValidatePath(path);
+
+            List<Point> processedPath = new List<Point>(path.Count);
+            bool hasPreviousPoint = false;
+            double previousPointX = 0.0;
+            double previousPointY = 0.0;
+
+            for (int pointIndex = 0; pointIndex < path.Count; pointIndex++)
+            {
+                Point pathPoint = path[pointIndex];
+                // Consecutive duplicates should not change the score, so remove them once here.
+                if (hasPreviousPoint && pathPoint.X == previousPointX && pathPoint.Y == previousPointY)
+                {
+                    continue;
+                }
+
+                processedPath.Add(pathPoint);
+                previousPointX = pathPoint.X;
+                previousPointY = pathPoint.Y;
+                hasPreviousPoint = true;
+            }
+
+            return processedPath.ToArray();
         }
 
         private static void ValidatePath(List<Point> path)
@@ -183,6 +283,95 @@ namespace ns_ThreatAnalyzer
                         nameof(path));
                 }
             }
+        }
+
+        private static PathChunk[] BuildPathChunks(Point[] processedPath, int pathPointsPerBoundingBox)
+        {
+            if (pathPointsPerBoundingBox <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(pathPointsPerBoundingBox), "Path points per bounding box must be positive.");
+            }
+
+            int chunkCount = (processedPath.Length + pathPointsPerBoundingBox - 1) / pathPointsPerBoundingBox;
+            PathChunk[] pathChunks = new PathChunk[chunkCount];
+
+            for (int chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++)
+            {
+                int startIndex = chunkIndex * pathPointsPerBoundingBox;
+                int endIndex = Math.Min(startIndex + pathPointsPerBoundingBox, processedPath.Length) - 1;
+                pathChunks[chunkIndex] = new PathChunk
+                {
+                    StartIndex = startIndex,
+                    EndIndex = endIndex,
+                    Bounds = BuildPathChunkBounds(processedPath, startIndex, endIndex)
+                };
+            }
+
+            return pathChunks;
+        }
+
+        private static int GetPathPointsPerChunk(int processedPathPointCount, int targetPathChunkCount)
+        {
+            if (targetPathChunkCount <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(targetPathChunkCount), "Target path chunk count must be positive.");
+            }
+
+            return Math.Max(1, (processedPathPointCount + targetPathChunkCount - 1) / targetPathChunkCount);
+        }
+
+        private static BoundingBox BuildPathChunkBounds(Point[] processedPath, int startIndex, int endIndex)
+        {
+            Point firstPoint = processedPath[startIndex];
+            BoundingBox bounds = new BoundingBox
+            {
+                MinX = firstPoint.X,
+                MaxX = firstPoint.X,
+                MinY = firstPoint.Y,
+                MaxY = firstPoint.Y
+            };
+
+            for (int pointIndex = startIndex + 1; pointIndex <= endIndex; pointIndex++)
+            {
+                Point point = processedPath[pointIndex];
+                if (point.X < bounds.MinX)
+                {
+                    bounds.MinX = point.X;
+                }
+                if (point.X > bounds.MaxX)
+                {
+                    bounds.MaxX = point.X;
+                }
+                if (point.Y < bounds.MinY)
+                {
+                    bounds.MinY = point.Y;
+                }
+                if (point.Y > bounds.MaxY)
+                {
+                    bounds.MaxY = point.Y;
+                }
+            }
+
+            return bounds;
+        }
+
+        private static BoundingBox GetThreatBounds(ThreatMeta meta)
+        {
+            return new BoundingBox
+            {
+                MinX = meta.BoundsMinX,
+                MaxX = meta.BoundsMaxX,
+                MinY = meta.BoundsMinY,
+                MaxY = meta.BoundsMaxY
+            };
+        }
+
+        private static bool BoundsOverlap(BoundingBox a, BoundingBox b)
+        {
+            return a.MinX <= b.MaxX
+                && a.MaxX >= b.MinX
+                && a.MinY <= b.MaxY
+                && a.MaxY >= b.MinY;
         }
 
         private static bool TryGetThreatValueAtPoint(ThreatMeta meta, double pointX, double pointY, out float threatValue)

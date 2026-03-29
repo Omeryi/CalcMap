@@ -1,8 +1,12 @@
-function result = runAnalysis(repoRoot, mapState, pathPoints, currentPathFile)
+function result = runAnalysis(repoRoot, mapState, pathPoints, currentPathFile, analysisMode)
 
 exe = fullfile(repoRoot, "RunAnalyzer", "bin", "x64", "Release", "RunAnalyzer.exe");
 if ~isfile(exe)
     error("runAnalysis:MissingExecutable", "RunAnalyzer.exe was not found: %s", exe);
+end
+
+if nargin < 5
+    analysisMode = "Unoptimized";
 end
 
 pathFile = string(currentPathFile);
@@ -10,7 +14,8 @@ if strlength(pathFile) == 0 || ~isfile(char(pathFile))
     pathFile = string(savePath(mapState.Folder, pathPoints));
 end
 
-command = sprintf('"%s" "%s" "%s"', exe, char(mapState.JsonFile), char(pathFile));
+analysisModeArg = lower(char(string(analysisMode)));
+command = sprintf('"%s" "%s" "%s" "%s"', exe, char(mapState.JsonFile), char(pathFile), analysisModeArg);
 [status, output] = system(command);
 if status ~= 0
     error("runAnalysis:Failed", "%s", strtrim(output));
