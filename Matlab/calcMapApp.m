@@ -164,11 +164,25 @@ classdef calcMapApp < matlab.apps.AppBase
             end
 
             try
-                [savedFile, savedPath] = savePath(app.Map.Folder, app.Path);
+                threatResolution = getThreatResolution(app.Map.Threats);
+                currentResolution = getPathResolution(app.Path);
+                defaultSpacing = 2 * threatResolution;
+                if ~isfinite(defaultSpacing) || defaultSpacing <= 0
+                    defaultSpacing = currentResolution;
+                end
+
+                [ok, spacing] = promptPathResolution(defaultSpacing, currentResolution, threatResolution);
+                if ~ok
+                    app.updateStatus("Save path cancelled");
+                    return
+                end
+
+                [savedFile, savedPath] = savePath(app.Map.Folder, app.Path, spacing);
                 app.Path = savedPath;
                 app.CurrentPathFile = string(savedFile);
                 app.renderScene();
-                app.updateStatus(sprintf("Saved path (%d points): %s", size(savedPath, 1), char(app.CurrentPathFile)));
+                app.updateStatus(sprintf("Saved path (spacing %.3f, %d points): %s", ...
+                    spacing, size(savedPath, 1), char(app.CurrentPathFile)));
             catch ME
                 uialert(app.UIFigure, string(ME.message), "Save path failed");
                 app.updateStatus("Save path failed");

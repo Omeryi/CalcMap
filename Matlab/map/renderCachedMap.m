@@ -1,6 +1,6 @@
 function renderCache = renderCachedMap(ax, mapState, renderCache, renderOptions)
 
-requiredFields = {"ImageHandle", "OutlineHandle", "LabelHandles", "PathHaloHandle", "PathHandle", "ShowThreatLabels", "MapKey"};
+requiredFields = {"ImageHandle", "ColorbarHandle", "OutlineHandle", "LabelHandles", "PathHaloHandle", "PathHandle", "ShowThreatLabels", "MapKey"};
 if nargin < 3 || ~isstruct(renderCache) || ~all(isfield(renderCache, requiredFields))
     renderCache = emptyRenderCache();
 end
@@ -37,6 +37,11 @@ else
     renderCache.ImageHandle.CData = mapState.DisplayImage;
 end
 
+if ~isgraphicsHandle(renderCache.ColorbarHandle)
+    renderCache.ColorbarHandle = colorbar(ax);
+end
+renderCache.ColorbarHandle.Label.String = "Threat Intensity";
+
 hasThreatOutlines = threatSetHasOutlines(mapState.Threats);
 hasThreatLabels = threatSetHasLabels(mapState.Threats);
 overlayNeedsRefresh = ~strcmp(renderCache.MapKey, mapKey) ...
@@ -67,6 +72,7 @@ function renderCache = emptyRenderCache()
 renderCache = struct( ...
     "MapKey", "", ...
     "ImageHandle", [], ...
+    "ColorbarHandle", [], ...
     "OutlineHandle", [], ...
     "LabelHandles", [], ...
     "PathHaloHandle", [], ...

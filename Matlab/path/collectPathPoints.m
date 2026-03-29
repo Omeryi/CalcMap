@@ -1,4 +1,4 @@
-function points = collectPathPoints(fig, ax, mapName, mapState, existingPath, renderOptions, targetSpacing)
+function points = collectPathPoints(fig, ax, mapName, mapState, existingPath, renderOptions)
 
 if nargin < 5
     existingPath = [];
@@ -6,11 +6,6 @@ end
 if nargin < 6
     renderOptions = struct();
 end
-if nargin < 7 || ~isfinite(targetSpacing) || targetSpacing <= 0
-    error("collectPathPoints:InvalidTargetSpacing", ...
-        "Target path spacing must be a positive finite number.");
-end
-
 mapLabel = string(mapName);
 if nargin >= 4 && ~isempty(mapState)
     formattedName = formatMapDisplayName(mapState);
@@ -109,20 +104,9 @@ end
 
     function updateDrawTitle()
         clickedPointCount = size(points, 1);
-        approximateSavedPointCount = getApproximateSavedPointCount(points, targetSpacing);
         title(ax, sprintf([ ...
-            'Map: %s | Click points, ENTER to finish, ESC to cancel | ' ...
-            'Target spacing %.3f | Clicked %d | Approx saved points %d'], ...
-            char(mapLabel), targetSpacing, clickedPointCount, approximateSavedPointCount));
-    end
-
-    function approximateSavedPointCount = getApproximateSavedPointCount(pathPoints, spacing)
-        if isempty(pathPoints)
-            approximateSavedPointCount = 0;
-            return
-        end
-
-        approximateSavedPointCount = size(resamplePathBySpacing(pathPoints, spacing), 1);
+            'Map: %s | Click points, ENTER to finish, ESC to cancel | Clicked %d'], ...
+            char(mapLabel), clickedPointCount));
     end
 
 end
