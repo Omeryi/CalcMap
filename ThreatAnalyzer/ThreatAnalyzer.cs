@@ -36,7 +36,7 @@ namespace ns_ThreatAnalyzer
     {
         // Path points are grouped into coarse bounding boxes so optimized mode can skip
         // large stretches of the path for threats that are obviously far away.
-        private const int DefaultTargetPathChunkCount = 10;
+        private const int DefaultTargetPathChunkCount = 20;
         // Count how many processed path points meaningfully contribute to each threat.
         private const float ThreatValueCountThreshold = 0.2f;
 

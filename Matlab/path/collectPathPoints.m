@@ -1,10 +1,14 @@
-function points = collectPathPoints(fig, ax, mapName, mapState, existingPath, renderOptions)
+function points = collectPathPoints(fig, ax, mapName, mapState, existingPath, renderOptions, targetSpacing)
 
 if nargin < 5
     existingPath = [];
 end
 if nargin < 6
     renderOptions = struct();
+end
+if nargin < 7 || ~isfinite(targetSpacing) || targetSpacing <= 0
+    error("collectPathPoints:InvalidTargetSpacing", ...
+        "Target path spacing must be a positive finite number.");
 end
 mapLabel = string(mapName);
 if nargin >= 4 && ~isempty(mapState)
@@ -48,6 +52,8 @@ restoreInteractionState();
 
 if cancelled
     points = [];
+elseif ~isempty(points)
+    points = resamplePathBySpacing(points, targetSpacing);
 end
 
     function handleMouseClick(~, ~)
@@ -69,6 +75,8 @@ end
         end
 
         points(end + 1, :) = point;
+        % Preview the raw clicked polyline so the user sees every segment
+        % immediately, while the title still reports the sampled path count.
         renderCache = updatePathOverlay(ax, renderCache, mapState, points);
         updateDrawTitle();
     end
@@ -104,9 +112,20 @@ end
 
     function updateDrawTitle()
         clickedPointCount = size(points, 1);
+        approximateSavedPointCount = getApproximateSavedPointCount(points, targetSpacing);
         title(ax, sprintf([ ...
-            'Map: %s | Click points, ENTER to finish, ESC to cancel | Clicked %d'], ...
-            char(mapLabel), clickedPointCount));
+            'Map: %s | Click points, ENTER to finish, ESC to cancel | ' ...
+            'Target spacing %.3f | Clicked %d | Saved points %d'], ...
+            char(mapLabel), targetSpacing, clickedPointCount, approximateSavedPointCount));
+    end
+
+    function approximateSavedPointCount = getApproximateSavedPointCount(pathPoints, spacing)
+        if isempty(pathPoints)
+            approximateSavedPointCount = 0;
+            return
+        end
+
+        approximateSavedPointCount = size(resamplePathBySpacing(pathPoints, spacing), 1);
     end
 
 end
